@@ -7,7 +7,8 @@ const {
   createOrUpdateDataSources,
   removeChangedDataSources,
   createSchema,
-  deleteGraphqlApi
+  deleteGraphqlApi,
+  createOrUpdateResolvers
   // setupApiKey
 } = require('./utils')
 
@@ -24,8 +25,10 @@ class AwsAppSync extends Component {
     config.apiId = graphqlApi.apiId
     config.arn = graphqlApi.arn
     await createOrUpdateDataSources(appSync, config, this.context.debug)
-    await removeChangedDataSources(appSync, config, this.state, this.context.debug)
     await createSchema(appSync, config, this.context.debug)
+    await createOrUpdateResolvers(appSync, config, this.context.debug)
+    await removeChangedDataSources(appSync, config, this.state, this.context.debug)
+
     // await setupApiKey(appSync, config, this.context.debug)
     this.state = pick(['apiId', 'arn'], config)
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
@@ -38,11 +41,9 @@ class AwsAppSync extends Component {
     const config = mergeDeepRight(defaults, inputs)
     const { appSync } = getClients(this.context.credentials.aws, config.region)
     await deleteGraphqlApi(appSync, { apiId: this.state.apiId })
+    this.state = {}
+    await this.save()
   }
 }
 
 module.exports = AwsAppSync
-
-// create service role if not set
-// create datasources
-//

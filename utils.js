@@ -1,7 +1,7 @@
 const AWS = require('aws-sdk')
 const { equals, find, isNil, merge, not, pick } = require('ramda')
 
-const { listAll } = require('./lib/utils')
+const { listAll } = require('./lib')
 
 /**
  * Get AWS clients
@@ -60,6 +60,9 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
       ({ name }) => equals(name, config.name),
       await listAll(appSync, 'listGraphqlApis', {}, 'graphqlApis')
     )
+    if (not(isNil(graphqlApi))) {
+      config.apiId = graphqlApi.apiId
+    }
   }
 
   if (isNil(graphqlApi)) {
@@ -80,10 +83,12 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
 }
 
 const deleteGraphqlApi = async (appSync, config) => {
-  try {
+  try {
     await appSync.deleteGraphqlApi({ apiId: config.apiId }).promise()
   } catch (error) {
-    console.log(error)
+    if (not(equals(error.code, 'NotFoundException'))) {
+      throw error
+    }
   }
 }
 
@@ -113,6 +118,7 @@ module.exports = {
   createOrUpdateGraphqlApi,
   deleteGraphqlApi,
   ...require('./lib/datasources'),
-  ...require('./lib/schema')
+  ...require('./lib/schema'),
+  ...require('./lib/resolvers')
   // setupApiKey
 }
