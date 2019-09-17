@@ -5,7 +5,9 @@ const {
   getClients,
   createOrUpdateGraphqlApi,
   createOrUpdateDataSources,
-  removeChangedDataSources
+  removeChangedDataSources,
+  createSchema,
+  deleteGraphqlApi
   // setupApiKey
 } = require('./utils')
 
@@ -23,7 +25,7 @@ class AwsAppSync extends Component {
     config.arn = graphqlApi.arn
     await createOrUpdateDataSources(appSync, config, this.context.debug)
     await removeChangedDataSources(appSync, config, this.state, this.context.debug)
-
+    await createSchema(appSync, config, this.context.debug)
     // await setupApiKey(appSync, config, this.context.debug)
     this.state = pick(['apiId', 'arn'], config)
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
@@ -32,7 +34,11 @@ class AwsAppSync extends Component {
   }
 
   // eslint-disable-next-line no-unused-vars
-  async remove(inputs = {}) {}
+  async remove(inputs = {}) {
+    const config = mergeDeepRight(defaults, inputs)
+    const { appSync } = getClients(this.context.credentials.aws, config.region)
+    await deleteGraphqlApi(appSync, { apiId: this.state.apiId })
+  }
 }
 
 module.exports = AwsAppSync

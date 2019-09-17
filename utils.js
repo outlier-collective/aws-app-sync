@@ -32,7 +32,12 @@ const authentication = (authenticationType) => {
  * @returns {object} - graphqlApi
  */
 const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
-  const inputFields = ['name', 'authenticationType', authentication(config.authenticationType)]
+  const inputFields = [
+    'name',
+    'authenticationType',
+    authentication(config.authenticationType),
+    'additionalAuthenticationProviders'
+  ]
   const inputs = pick(inputFields, config)
   let graphqlApi
   if (config.apiId) {
@@ -74,6 +79,14 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
   return graphqlApi
 }
 
+const deleteGraphqlApi = async (appSync, config) => {
+  try {
+    await appSync.deleteGraphqlApi({ apiId: config.apiId }).promise()
+  } catch (error) {
+    console.log(error)
+  }
+}
+
 // const setupApiKey = async (appSync, config, debug) => {
 //   TODO - how to index api keys e.g. name or id
 //   if (not(isEmpty(config.apiKeys))) {
@@ -98,6 +111,8 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
 module.exports = {
   getClients,
   createOrUpdateGraphqlApi,
-  ...require('./lib/datasources')
+  deleteGraphqlApi,
+  ...require('./lib/datasources'),
+  ...require('./lib/schema')
   // setupApiKey
 }
