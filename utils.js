@@ -119,6 +119,7 @@ module.exports = {
   deleteGraphqlApi,
   ...require('./lib/datasources'),
   ...require('./lib/schema'),
-  ...require('./lib/resolvers')
+  ...require('./lib/resolvers'),
+  ...require('./lib/functions')
   // setupApiKey
 }
