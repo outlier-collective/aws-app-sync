@@ -1,9 +1,11 @@
 const { Component } = require('@serverless/core')
-const { mergeDeepRight, pick, map } = require('ramda')
+const { isNil, mergeDeepRight, pick, map } = require('ramda')
+const AWS = require('aws-sdk')
 
 const {
   getClients,
   createSchema,
+  createServiceRole,
   createOrUpdateGraphqlApi,
   createOrUpdateDataSources,
   createOrUpdateResolvers,
@@ -27,6 +29,16 @@ class AwsAppSync extends Component {
     const graphqlApi = await createOrUpdateGraphqlApi(appSync, config, this.context.debug)
     config.apiId = graphqlApi.apiId
     config.arn = graphqlApi.arn
+
+    const awsIamRole = await this.load('@serverless/aws-iam-role')
+    const serviceRole = await createServiceRole(awsIamRole, config, this.context.debug)
+
+    config.dataSources = map((datasource) => {
+      if (isNil(datasource.serviceRoleArn)) {
+        datasource.serviceRoleArn = serviceRole.arn
+      }
+      return datasource
+    }, config.dataSources)
 
     config.dataSources = await createOrUpdateDataSources(appSync, config, this.context.debug)
     await createSchema(appSync, config, this.context.debug)
@@ -52,6 +64,8 @@ class AwsAppSync extends Component {
     const config = mergeDeepRight(defaults, inputs)
     const { appSync } = getClients(this.context.credentials.aws, config.region)
     await deleteGraphqlApi(appSync, { apiId: this.state.apiId })
+    const awsIamRole = await this.load('@serverless/aws-iam-role')
+    await awsIamRole.remove()
     this.state = {}
     await this.save()
   }

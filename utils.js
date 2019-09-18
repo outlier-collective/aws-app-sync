@@ -120,6 +120,7 @@ module.exports = {
   ...require('./lib/datasources'),
   ...require('./lib/schema'),
   ...require('./lib/resolvers'),
-  ...require('./lib/functions')
+  ...require('./lib/functions'),
+  ...require('./lib/role')
   // setupApiKey
 }
