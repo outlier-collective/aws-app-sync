@@ -41,7 +41,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
   const inputs = pick(inputFields, config)
   let graphqlApi
   if (config.apiId) {
-    debug(`Fetching graphql API by API id '${config.apiId}'`)
+    debug(`Fetching graphql API by API id ${config.apiId}`)
     try {
       const response = await appSync.getGraphqlApi({ apiId: config.apiId }).promise()
       // eslint-disable-next-line prefer-destructuring
@@ -55,7 +55,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
   }
 
   if (isNil(graphqlApi)) {
-    debug(`Fetching graphql API by API name '${config.name}'`)
+    debug(`Fetching graphql API by API name ${config.name}`)
     graphqlApi = find(
       ({ name }) => equals(name, config.name),
       await listAll(appSync, 'listGraphqlApis', {}, 'graphqlApis')
@@ -66,12 +66,12 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
   }
 
   if (isNil(graphqlApi)) {
-    debug(`Create a new graphql API`)
+    debug('Creating a new graphql API')
     const response = await appSync.createGraphqlApi(inputs).promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi
   } else if (not(equals(inputs, pick(inputFields, graphqlApi)))) {
-    debug(`Update an existing graphql API`)
+    debug(`Updating graphql API ${config.apiId}`)
     const response = await appSync
       .updateGraphqlApi(merge(inputs, { apiId: config.apiId }))
       .promise()
