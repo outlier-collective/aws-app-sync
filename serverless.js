@@ -10,6 +10,7 @@ const {
   createOrUpdateDataSources,
   createOrUpdateResolvers,
   createOrUpdateFunctions,
+  createOrUpdateApiKeys,
   removeObsoleteDataSources,
   removeObsoleteResolvers,
   removeObsoleteFunctions,
@@ -43,8 +44,7 @@ class AwsAppSync extends Component {
     config.schemaChecksum = await createSchema(appSync, config, this.state, this.context.debug)
     config.mappingTemplates = await createOrUpdateResolvers(appSync, config, this.context.debug)
     config.functions = await createOrUpdateFunctions(appSync, config, this.context.debug)
-
-    // await setupApiKey(appSync, config, this.context.debug)
+    await createOrUpdateApiKeys(appSync, config, this.context.debug)
 
     await removeObsoleteDataSources(appSync, config, this.state, this.context.debug)
     await removeObsoleteResolvers(appSync, config, this.state, this.context.debug)

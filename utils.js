@@ -92,27 +92,6 @@ const deleteGraphqlApi = async (appSync, config) => {
   }
 }
 
-// const setupApiKey = async (appSync, config, debug) => {
-//   TODO - how to index api keys e.g. name or id
-//   if (not(isEmpty(config.apiKeys))) {
-//     debug(`Fetching api keys`)
-//     let nextToken
-//     const apiKeys = []
-//     const deployedApiKeys = await listAll(
-//       appSync,
-//       'listApiKeys',
-//       { apiId: config.apiId },
-//       'apiKeys' // ?
-//     )
-//     await Promise.all(
-//       map(async (apiKey) => {
-//         console.log(apiKey)
-//       }, config.apiKeys)
-//     )
-//     const isoDateRegex = /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
-//   }
-// }
-
 module.exports = {
   getClients,
   createOrUpdateGraphqlApi,
@@ -121,6 +100,6 @@ module.exports = {
   ...require('./lib/schema'),
   ...require('./lib/resolvers'),
   ...require('./lib/functions'),
-  ...require('./lib/role')
-  // setupApiKey
+  ...require('./lib/role'),
+  ...require('./lib/apikeys')
 }
