@@ -44,13 +44,13 @@ class AwsAppSync extends Component {
     config.schemaChecksum = await createSchema(appSync, config, this.state, this.context.debug)
     config.mappingTemplates = await createOrUpdateResolvers(appSync, config, this.context.debug)
     config.functions = await createOrUpdateFunctions(appSync, config, this.context.debug)
-    await createOrUpdateApiKeys(appSync, config, this.context.debug)
+    config.apiKeys = await createOrUpdateApiKeys(appSync, config, this.state, this.context.debug)
 
     await removeObsoleteDataSources(appSync, config, this.state, this.context.debug)
     await removeObsoleteResolvers(appSync, config, this.state, this.context.debug)
     await removeObsoleteFunctions(appSync, config, this.state, this.context.debug)
 
-    this.state = pick(['apiId', 'arn', 'schemaChecksum'], config)
+    this.state = pick(['apiId', 'arn', 'schemaChecksum', 'apiKeys'], config)
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
     this.state.mappingTemplates = map(pick(['type', 'field']), config.mappingTemplates)
     this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
