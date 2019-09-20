@@ -36,7 +36,8 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
     'name',
     'authenticationType',
     authentication(config.authenticationType),
-    'additionalAuthenticationProviders'
+    'additionalAuthenticationProviders',
+    'logConfig'
   ]
   const inputs = pick(inputFields, config)
   let graphqlApi
