@@ -30,6 +30,7 @@ class AwsAppSync extends Component {
     const graphqlApi = await createOrUpdateGraphqlApi(appSync, config, this.context.debug)
     config.apiId = graphqlApi.apiId
     config.arn = graphqlApi.arn
+    config.uris = graphqlApi.uris
 
     const awsIamRole = await this.load('@serverless/aws-iam-role')
     const serviceRole = await createServiceRole(awsIamRole, config, this.context.debug)
@@ -52,12 +53,12 @@ class AwsAppSync extends Component {
     await removeObsoleteFunctions(appSync, config, this.state, this.context.debug)
     await removeObsoleteApiKeys(appSync, config, this.state, this.context.debug)
 
-    this.state = pick(['apiId', 'arn', 'schemaChecksum', 'apiKeys'], config)
+    this.state = pick(['apiId', 'arn', 'schemaChecksum', 'apiKeys', 'uris'], config)
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
     this.state.mappingTemplates = map(pick(['type', 'field']), config.mappingTemplates)
     this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
     await this.save()
-    return { graphqlApi: pick(['apiId', 'arn'], config) }
+    return { graphqlApi: pick(['apiId', 'arn', 'uris'], config) }
   }
 
   // eslint-disable-next-line no-unused-vars
