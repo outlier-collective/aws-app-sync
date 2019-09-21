@@ -14,6 +14,7 @@ const {
   removeObsoleteDataSources,
   removeObsoleteResolvers,
   removeObsoleteFunctions,
+  removeObsoleteApiKeys,
   deleteGraphqlApi
   // setupApiKey
 } = require('./utils')
@@ -49,6 +50,7 @@ class AwsAppSync extends Component {
     await removeObsoleteDataSources(appSync, config, this.state, this.context.debug)
     await removeObsoleteResolvers(appSync, config, this.state, this.context.debug)
     await removeObsoleteFunctions(appSync, config, this.state, this.context.debug)
+    await removeObsoleteApiKeys(appSync, config, this.state, this.context.debug)
 
     this.state = pick(['apiId', 'arn', 'schemaChecksum', 'apiKeys'], config)
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
