@@ -1,20 +1,20 @@
 const { Component } = require('@serverless/core')
-const { isNil, mergeDeepRight, pick, map, merge, not } = require('ramda')
+const { isEmpty, isNil, map, merge, mergeDeepRight, not, pick } = require('ramda')
 
 const {
-  getClients,
+  createOrUpdateApiKeys,
+  createOrUpdateDataSources,
+  createOrUpdateFunctions,
+  createOrUpdateGraphqlApi,
+  createOrUpdateResolvers,
   createSchema,
   createServiceRole,
-  createOrUpdateGraphqlApi,
-  createOrUpdateDataSources,
-  createOrUpdateResolvers,
-  createOrUpdateFunctions,
-  createOrUpdateApiKeys,
-  removeObsoleteDataSources,
-  removeObsoleteResolvers,
-  removeObsoleteFunctions,
+  getClients,
+  removeGraphqlApi,
   removeObsoleteApiKeys,
-  deleteGraphqlApi
+  removeObsoleteDataSources,
+  removeObsoleteFunctions,
+  removeObsoleteResolvers
 } = require('./utils')
 
 const defaults = {
@@ -60,7 +60,7 @@ class AwsAppSync extends Component {
     let output = {
       graphqlApi: pick(['apiId', 'arn', 'uris'], config)
     }
-    if (not(isNil(config.apiKeys))) {
+    if (not(isNil(config.apiKeys)) && not(isEmpty(config.apiKeys))) {
       output = merge(output, {
         apiKeys: map(({ id }) => id, config.apiKeys)
       })
@@ -72,7 +72,7 @@ class AwsAppSync extends Component {
   async remove(inputs = {}) {
     const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
     const { appSync } = getClients(this.context.credentials.aws, config.region)
-    await deleteGraphqlApi(appSync, { apiId: this.state.apiId })
+    await removeGraphqlApi(appSync, { apiId: this.state.apiId })
     const awsIamRole = await this.load('@serverless/aws-iam-role')
     await awsIamRole.remove()
     this.state = {}
