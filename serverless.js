@@ -1,5 +1,5 @@
 const { Component } = require('@serverless/core')
-const { isNil, mergeDeepRight, pick, map, merge } = require('ramda')
+const { isNil, mergeDeepRight, pick, map, merge, not } = require('ramda')
 
 const {
   getClients,
@@ -15,7 +15,6 @@ const {
   removeObsoleteFunctions,
   removeObsoleteApiKeys,
   deleteGraphqlApi
-  // setupApiKey
 } = require('./utils')
 
 const defaults = {
@@ -57,7 +56,16 @@ class AwsAppSync extends Component {
     this.state.mappingTemplates = map(pick(['type', 'field']), config.mappingTemplates)
     this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
     await this.save()
-    return { graphqlApi: pick(['apiId', 'arn', 'uris'], config) }
+
+    let output = {
+      graphqlApi: pick(['apiId', 'arn', 'uris'], config)
+    }
+    if (not(isNil(config.apiKeys))) {
+      output = merge(output, {
+        apiKeys: map(({ id }) => id, config.apiKeys)
+      })
+    }
+    return output
   }
 
   // eslint-disable-next-line no-unused-vars
