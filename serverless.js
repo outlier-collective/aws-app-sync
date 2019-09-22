@@ -1,6 +1,5 @@
 const { Component } = require('@serverless/core')
 const { isNil, mergeDeepRight, pick, map, merge } = require('ramda')
-const AWS = require('aws-sdk')
 
 const {
   getClients,
