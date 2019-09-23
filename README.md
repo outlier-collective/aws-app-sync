@@ -33,15 +33,42 @@ AWS_SECRET_ACCESS_KEY=XXX
 
 ### 3. Configure
 
-You can configure the component to either create a new appsync service from scratch, or extend an existing one.
-
-#### Creating REST APIs
-
-You can create a new ....
-
 ```yml
 # serverless.yml
-temp: temp
+myAppSync:
+  component: '@serverless/aws-app-sync'
+  inputs:
+    name: my-api-name
+    authenticationType: API_KEY # API_KEY || AWS_IAM || AMAZON_COGNITO_USER_POOLS || OPENID_CONNECT
+    apiKeys:
+      - myApiKey
+    # userPoolConfig:
+    #   awsRegion: ${region}
+    #   defaultAction: "ALLOW"
+    #   userPoolId: "us-east-1_nnnn"
+    # openIDConnectConfig: # if OPENID_CONNECT is used
+    #    issuer: "NNN",
+    #    authTTL: "1234"
+    #    clientId: "NNN"
+    #    iatTTL: "NNN"
+    mappingTemplates:
+      - dataSource: dynamodb_ds
+        type: Query
+        field: getMyField
+        request: mapping-template-request.vtl
+        response: mapping-template-response.vtl
+    functions:
+      - dataSource: dynamodb_ds
+        name: my-function
+        request: function-request.vtl
+        response: function-response.vtl
+    dataSources:
+      - type: AMAZON_DYNAMODB
+        name: dynamodb_ds
+        # serviceRoleArn: ${serviceRole.arn} # when not set role is created behind the scenes
+        config:
+          tableName: ${tableName}
+    schema: schema.graphql
 ```
 
 ### 4. Deploy
