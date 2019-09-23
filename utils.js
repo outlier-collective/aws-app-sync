@@ -1,5 +1,5 @@
 const AWS = require('aws-sdk')
-const { equals, find, isNil, merge, not, pick } = require('ramda')
+const { equals, find, isNil, map, merge, not, pick } = require('ramda')
 
 const { listAll } = require('./lib')
 
@@ -25,6 +25,47 @@ const authentication = (authenticationType) => {
   }
 }
 
+const openIdConnectDefaults = (config) =>
+  merge(
+    {
+      clientId: null,
+      iatTTL: 0,
+      authTTL: 0
+    },
+    config
+  )
+
+const userPoolDefaults = (config) =>
+  merge(
+    {
+      appIdClientRegex: null
+    },
+    config
+  )
+
+const addDefaults = (inputs) => {
+  if (inputs.openIDConnectConfig) {
+    inputs.openIDConnectConfig = openIdConnectDefaults(inputs.openIDConnectConfig)
+  } else if (inputs.userPoolConfig) {
+    inputs.userPoolConfig = userPoolDefaults(inputs.userPoolConfig)
+  }
+  if (inputs.additionalAuthenticationProviders) {
+    inputs.additionalAuthenticationProviders = map((additionalAuthenticationProvider) => {
+      if (additionalAuthenticationProvider.openIDConnectConfig) {
+        additionalAuthenticationProvider.openIDConnectConfig = openIdConnectDefaults(
+          additionalAuthenticationProvider.openIDConnectConfig
+        )
+      } else if (additionalAuthenticationProvider.userPoolConfig) {
+        additionalAuthenticationProvider.userPoolConfig = userPoolDefaults(
+          additionalAuthenticationProvider.userPoolConfig
+        )
+      }
+      return additionalAuthenticationProvider
+    }, inputs.additionalAuthenticationProviders)
+  }
+  return inputs
+}
+
 /**
  * Create or update graphql api
  * @param {object} appSync
@@ -39,7 +80,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
     'additionalAuthenticationProviders',
     'logConfig'
   ]
-  const inputs = pick(inputFields, config)
+  const inputs = addDefaults(pick(inputFields, config))
   let graphqlApi
   if (config.apiId) {
     debug(`Fetching graphql API by API id ${config.apiId}`)
