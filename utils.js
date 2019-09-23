@@ -83,7 +83,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
   return graphqlApi
 }
 
-const deleteGraphqlApi = async (appSync, config) => {
+const removeGraphqlApi = async (appSync, config) => {
   try {
     await appSync.deleteGraphqlApi({ apiId: config.apiId }).promise()
   } catch (error) {
@@ -96,7 +96,7 @@ const deleteGraphqlApi = async (appSync, config) => {
 module.exports = {
   getClients,
   createOrUpdateGraphqlApi,
-  deleteGraphqlApi,
+  removeGraphqlApi,
   ...require('./lib/datasources'),
   ...require('./lib/schema'),
   ...require('./lib/resolvers'),
