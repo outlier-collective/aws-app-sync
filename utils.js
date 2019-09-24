@@ -1,5 +1,5 @@
 const AWS = require('aws-sdk')
-const { equals, find, isNil, map, merge, not, pick } = require('ramda')
+const { clone, equals, find, isNil, map, merge, not, pick } = require('ramda')
 
 const { listAll } = require('./lib')
 
@@ -80,7 +80,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
     'additionalAuthenticationProviders',
     'logConfig'
   ]
-  const inputs = addDefaults(pick(inputFields, config))
+  const inputs = pick(inputFields, config)
   let graphqlApi
   if (config.apiId) {
     debug(`Fetching graphql API by API id ${config.apiId}`)
@@ -112,7 +112,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
     const response = await appSync.createGraphqlApi(inputs).promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi
-  } else if (not(equals(inputs, pick(inputFields, graphqlApi)))) {
+  } else if (not(equals(addDefaults(clone(inputs)), pick(inputFields, graphqlApi)))) {
     debug(`Updating graphql API ${config.apiId}`)
     const response = await appSync
       .updateGraphqlApi(merge(inputs, { apiId: config.apiId }))
