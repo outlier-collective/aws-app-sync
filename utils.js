@@ -114,8 +114,10 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
     graphqlApi = response.graphqlApi
   } else if (not(equals(addDefaults(clone(inputs)), pick(inputFields, graphqlApi)))) {
     debug(`Updating graphql API ${config.apiId}`)
+    const name = inputs.name || graphqlApi.name
+    const authenticationType = inputs.authenticationType || graphqlApi.authenticationType
     const response = await appSync
-      .updateGraphqlApi(merge(inputs, { apiId: config.apiId }))
+      .updateGraphqlApi(merge(inputs, { apiId: config.apiId, name, authenticationType }))
       .promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi

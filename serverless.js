@@ -26,7 +26,7 @@ class AwsAppSync extends Component {
     const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
     const { appSync } = getClients(this.context.credentials.aws, config.region)
     const graphqlApi = await createOrUpdateGraphqlApi(appSync, config, this.context.debug)
-    config.apiId = graphqlApi.apiId
+    config.apiId = graphqlApi.apiId || config.apiId
     config.arn = graphqlApi.arn
     config.uris = graphqlApi.uris
 
@@ -38,7 +38,7 @@ class AwsAppSync extends Component {
         datasource.serviceRoleArn = serviceRole.arn
       }
       return datasource
-    }, config.dataSources)
+    }, config.dataSources || [])
 
     config.dataSources = await createOrUpdateDataSources(appSync, config, this.context.debug)
     config.schemaChecksum = await createSchema(appSync, config, this.state, this.context.debug)
