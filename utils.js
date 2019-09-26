@@ -1,5 +1,5 @@
 const AWS = require('aws-sdk')
-const { equals, find, isNil, merge, not, pick } = require('ramda')
+const { clone, equals, find, isEmpty, isNil, map, merge, not, pick } = require('ramda')
 
 const { listAll } = require('./lib')
 
@@ -23,6 +23,47 @@ const authentication = (authenticationType) => {
     case 'OPENID_CONNECT':
       return 'openIDConnectConfig'
   }
+}
+
+const openIdConnectDefaults = (config) =>
+  merge(
+    {
+      clientId: null,
+      iatTTL: 0,
+      authTTL: 0
+    },
+    config
+  )
+
+const userPoolDefaults = (config) =>
+  merge(
+    {
+      appIdClientRegex: null
+    },
+    config
+  )
+
+const addDefaults = (inputs) => {
+  if (inputs.openIDConnectConfig) {
+    inputs.openIDConnectConfig = openIdConnectDefaults(inputs.openIDConnectConfig)
+  } else if (inputs.userPoolConfig) {
+    inputs.userPoolConfig = userPoolDefaults(inputs.userPoolConfig)
+  }
+  if (inputs.additionalAuthenticationProviders) {
+    inputs.additionalAuthenticationProviders = map((additionalAuthenticationProvider) => {
+      if (additionalAuthenticationProvider.openIDConnectConfig) {
+        additionalAuthenticationProvider.openIDConnectConfig = openIdConnectDefaults(
+          additionalAuthenticationProvider.openIDConnectConfig
+        )
+      } else if (additionalAuthenticationProvider.userPoolConfig) {
+        additionalAuthenticationProvider.userPoolConfig = userPoolDefaults(
+          additionalAuthenticationProvider.userPoolConfig
+        )
+      }
+      return additionalAuthenticationProvider
+    }, inputs.additionalAuthenticationProviders)
+  }
+  return inputs
 }
 
 /**
@@ -71,11 +112,13 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
     const response = await appSync.createGraphqlApi(inputs).promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi
-  } else if (not(equals(inputs, pick(inputFields, graphqlApi)))) {
+  } else if (
+    not(equals(addDefaults(clone(inputs)), pick(inputFields, graphqlApi))) &&
+    not(isEmpty(inputs))
+  ) {
     debug(`Updating graphql API ${config.apiId}`)
-    const response = await appSync
-      .updateGraphqlApi(merge(inputs, { apiId: config.apiId }))
-      .promise()
+    const parameters = merge(pick(inputFields, graphqlApi), merge(inputs, { apiId: config.apiId }))
+    const response = await appSync.updateGraphqlApi(parameters).promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi
   }
@@ -84,11 +127,13 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
 }
 
 const removeGraphqlApi = async (appSync, config) => {
-  try {
-    await appSync.deleteGraphqlApi({ apiId: config.apiId }).promise()
-  } catch (error) {
-    if (not(equals(error.code, 'NotFoundException'))) {
-      throw error
+  if (not(isNil(config.apiId))) {
+    try {
+      await appSync.deleteGraphqlApi({ apiId: config.apiId }).promise()
+    } catch (error) {
+      if (not(equals(error.code, 'NotFoundException'))) {
+        throw error
+      }
     }
   }
 }

@@ -26,7 +26,7 @@ class AwsAppSync extends Component {
     const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
     const { appSync } = getClients(this.context.credentials.aws, config.region)
     const graphqlApi = await createOrUpdateGraphqlApi(appSync, config, this.context.debug)
-    config.apiId = graphqlApi.apiId
+    config.apiId = graphqlApi.apiId || config.apiId
     config.arn = graphqlApi.arn
     config.uris = graphqlApi.uris
 
@@ -38,7 +38,7 @@ class AwsAppSync extends Component {
         datasource.serviceRoleArn = serviceRole.arn
       }
       return datasource
-    }, config.dataSources)
+    }, config.dataSources || [])
 
     config.dataSources = await createOrUpdateDataSources(appSync, config, this.context.debug)
     config.schemaChecksum = await createSchema(appSync, config, this.state, this.context.debug)
@@ -51,7 +51,8 @@ class AwsAppSync extends Component {
     await removeObsoleteFunctions(appSync, config, this.state, this.context.debug)
     await removeObsoleteApiKeys(appSync, config, this.state, this.context.debug)
 
-    this.state = pick(['apiId', 'arn', 'schemaChecksum', 'apiKeys', 'uris'], config)
+    this.state = pick(['arn', 'schemaChecksum', 'apiKeys', 'uris'], config)
+    this.state.apiId = isNil(inputs.apiId) ? config.apiId : undefined
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
     this.state.mappingTemplates = map(pick(['type', 'field']), config.mappingTemplates)
     this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
