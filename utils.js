@@ -127,11 +127,13 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
 }
 
 const removeGraphqlApi = async (appSync, config) => {
-  try {
-    await appSync.deleteGraphqlApi({ apiId: config.apiId }).promise()
-  } catch (error) {
-    if (not(equals(error.code, 'NotFoundException'))) {
-      throw error
+  if (not(isNil(config.apiId))) {
+    try {
+      await appSync.deleteGraphqlApi({ apiId: config.apiId }).promise()
+    } catch (error) {
+      if (not(equals(error.code, 'NotFoundException'))) {
+        throw error
+      }
     }
   }
 }
