@@ -1,5 +1,5 @@
 const AWS = require('aws-sdk')
-const { clone, equals, find, isNil, map, merge, not, pick } = require('ramda')
+const { clone, equals, find, isEmpty, isNil, map, merge, not, pick } = require('ramda')
 
 const { listAll } = require('./lib')
 
@@ -112,13 +112,13 @@ const createOrUpdateGraphqlApi = async (appSync, config, debug) => {
     const response = await appSync.createGraphqlApi(inputs).promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi
-  } else if (not(equals(addDefaults(clone(inputs)), pick(inputFields, graphqlApi)))) {
+  } else if (
+    not(equals(addDefaults(clone(inputs)), pick(inputFields, graphqlApi))) &&
+    not(isEmpty(inputs))
+  ) {
     debug(`Updating graphql API ${config.apiId}`)
-    const name = inputs.name || graphqlApi.name
-    const authenticationType = inputs.authenticationType || graphqlApi.authenticationType
-    const response = await appSync
-      .updateGraphqlApi(merge(inputs, { apiId: config.apiId, name, authenticationType }))
-      .promise()
+    const parameters = merge(pick(inputFields, graphqlApi), merge(inputs, { apiId: config.apiId }))
+    const response = await appSync.updateGraphqlApi(parameters).promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi
   }
