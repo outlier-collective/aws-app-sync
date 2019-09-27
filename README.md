@@ -20,7 +20,7 @@ A full featured [Serverless Component](https://github.com/serverless/components)
 1. [Install](#1-install)
 2. [Create](#2-create)
 3. [Configure](#3-configure)
-    - [Create/Reuse APIs](#create-and-reuse-apis)
+    - [Create or Reuse APIs](#create-or-reuse-apis)
     - [Schema](#schema)
     - [Authentication](#authentication)
     - [Data Sources](#data-sources)
@@ -38,9 +38,8 @@ $ npm install -g serverless
 
 Just create the following simple boilerplate:
 
-```shell
+```
 $ touch serverless.yml # more info in the "Configure" section below
-$ touch index.js       # your lambda code
 $ touch .env           # your AWS api keys
 ```
 
@@ -90,7 +89,7 @@ myAppSync:
     schema: schema.graphql
 ```
 
-#### Create and Reuse APIs
+#### Create or Reuse APIs
 
 #### Schema
 
