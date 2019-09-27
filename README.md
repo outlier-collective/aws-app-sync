@@ -1,12 +1,31 @@
-# aws-app-sync
+# AWS AppSync Component
+
+A full featured [Serverless Component](https://github.com/serverless/components) that instantly provisions an AppSync API on AWS.
+
+- [x] Deploys in ~10 Seconds
+- [x] Creates New APIs or Reuse Existing Ones
+- [x] Supports Lambda Data Source
+- [x] Supports DynamoDB Data Source
+- [x] Supports ElasticSearch Data Source
+- [x] Supports Relational Database Data Source
+- [x] Supports API Keys Authentication
+- [x] Supports Cognito User Pools Authentication
+- [x] Supports OpenID Connect Authentication
+- [x] Supports AppSync Functions
 
 Easily deploy AWS AppSync apps with [Serverless Components](https://github.com/serverless/components).
 
-## Table of Contents
+## Contents
 
 1. [Install](#1-install)
 2. [Create](#2-create)
 3. [Configure](#3-configure)
+    - [Create/Reuse APIs](#create-reuse-apis)
+    - [Schema](#schema)
+    - [Authentication](#authentication)
+    - [Data Sources](#data-sources)
+    - [Mapping Templates](#mapping-templates)
+    - [Functions](#functions)
 4. [Deploy](#4-deploy)
 
 ### 1. Install
@@ -70,6 +89,18 @@ myAppSync:
           tableName: ${tableName}
     schema: schema.graphql
 ```
+
+#### Create/Reuse APIs
+
+#### Schema
+
+#### Authentication
+
+#### Data Sources
+
+#### Mapping Templates
+
+#### Functions
 
 ### 4. Deploy
 
