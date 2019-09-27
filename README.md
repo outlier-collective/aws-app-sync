@@ -2,6 +2,8 @@
 
 A full featured [Serverless Component](https://github.com/serverless/components) that instantly provisions an AppSync API on AWS.
 
+## Features
+
 - [x] Deploys in ~10 Seconds
 - [x] Creates New APIs or Reuse Existing Ones
 - [x] Supports Lambda Data Source
@@ -12,8 +14,6 @@ A full featured [Serverless Component](https://github.com/serverless/components)
 - [x] Supports Cognito User Pools Authentication
 - [x] Supports OpenID Connect Authentication
 - [x] Supports AppSync Functions
-
-Easily deploy AWS AppSync apps with [Serverless Components](https://github.com/serverless/components).
 
 ## Contents
 
