@@ -20,7 +20,7 @@ Easily deploy AWS AppSync apps with [Serverless Components](https://github.com/s
 1. [Install](#1-install)
 2. [Create](#2-create)
 3. [Configure](#3-configure)
-    - [Create/Reuse APIs](#create-reuse-apis)
+    - [Create/Reuse APIs](#create-and-reuse-apis)
     - [Schema](#schema)
     - [Authentication](#authentication)
     - [Data Sources](#data-sources)
@@ -90,7 +90,7 @@ myAppSync:
     schema: schema.graphql
 ```
 
-#### Create/Reuse APIs
+#### Create and Reuse APIs
 
 #### Schema
 
