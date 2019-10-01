@@ -46,13 +46,14 @@ class AwsAppSync extends Component {
     config.functions = await createOrUpdateFunctions(appSync, config, this.context.debug)
     config.apiKeys = await createOrUpdateApiKeys(appSync, config, this.state, this.context.debug)
 
-    await removeObsoleteDataSources(appSync, config, this.state, this.context.debug)
     await removeObsoleteResolvers(appSync, config, this.state, this.context.debug)
     await removeObsoleteFunctions(appSync, config, this.state, this.context.debug)
+    await removeObsoleteDataSources(appSync, config, this.state, this.context.debug)
     await removeObsoleteApiKeys(appSync, config, this.state, this.context.debug)
 
     this.state = pick(['arn', 'schemaChecksum', 'apiKeys', 'uris'], config)
-    this.state.apiId = isNil(inputs.apiId) ? config.apiId : undefined
+    this.state.apiId = config.apiId
+    this.state.isApiCreator = isNil(inputs.apiId)
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
     this.state.mappingTemplates = map(pick(['type', 'field']), config.mappingTemplates)
     this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
@@ -73,7 +74,34 @@ class AwsAppSync extends Component {
   async remove(inputs = {}) {
     const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
     const { appSync } = getClients(this.context.credentials.aws, config.region)
-    await removeGraphqlApi(appSync, { apiId: this.state.apiId })
+    if (not(this.state.isApiCreator)) {
+      this.context.debug('Remove created resources from existing API without deleting the API.')
+      await removeObsoleteResolvers(
+        appSync,
+        { apiId: this.state.apiId, mappingTemplates: [] },
+        this.state,
+        this.context.debug
+      )
+      await removeObsoleteFunctions(
+        appSync,
+        { apiId: this.state.apiId, functions: [] },
+        this.state,
+        this.context.debug
+      )
+      await removeObsoleteDataSources(
+        appSync,
+        { apiId: this.state.apiId, dataSources: [] },
+        this.state,
+        this.context.debug
+      )
+      await removeObsoleteApiKeys(
+        appSync,
+        { apiId: this.state.apiId, apiKeys: [] },
+        this.context.debug
+      )
+    } else {
+      await removeGraphqlApi(appSync, { apiId: this.state.apiId })
+    }
     const awsIamRole = await this.load('@serverless/aws-iam-role')
     await awsIamRole.remove()
     this.state = {}

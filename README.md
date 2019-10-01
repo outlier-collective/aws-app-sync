@@ -51,49 +51,111 @@ AWS_SECRET_ACCESS_KEY=XXX
 
 ### 3. Configure
 
+#### Create or Reuse APIs
+
+Create a new AWS AppSync service
+
 ```yml
 # serverless.yml
+
 myAppSync:
   component: '@serverless/aws-app-sync'
   inputs:
-    name: my-api-name
-    authenticationType: API_KEY # API_KEY || AWS_IAM || AMAZON_COGNITO_USER_POOLS || OPENID_CONNECT
+    name: 'my-api-name'
+    authenticationType: 'API_KEY'
     apiKeys:
-      - myApiKey
-    # userPoolConfig:
-    #   awsRegion: ${region}
-    #   defaultAction: "ALLOW"
-    #   userPoolId: "us-east-1_nnnn"
-    # openIDConnectConfig: # if OPENID_CONNECT is used
-    #    issuer: "NNN",
-    #    authTTL: "1234"
-    #    clientId: "NNN"
-    #    iatTTL: "NNN"
+      - 'myApiKey'
     mappingTemplates:
-      - dataSource: dynamodb_ds
-        type: Query
-        field: getMyField
-        request: mapping-template-request.vtl
-        response: mapping-template-response.vtl
+      - dataSource: 'dynamodb_ds'
+        type: 'Query'
+        field: 'getMyField'
+        request: 'mapping-template-request.vtl'
+        response: 'mapping-template-response.vtl'
     functions:
-      - dataSource: dynamodb_ds
-        name: my-function
-        request: function-request.vtl
-        response: function-response.vtl
+      - dataSource: 'dynamodb_ds'
+        name: 'my-function'
+        request: 'function-request.vtl'
+        response: 'function-response.vtl'
     dataSources:
-      - type: AMAZON_DYNAMODB
-        name: dynamodb_ds
-        # serviceRoleArn: ${serviceRole.arn} # when not set role is created behind the scenes
+      - type: 'AMAZON_DYNAMODB'
+        name: 'dynamodb_ds'
         config:
-          tableName: ${tableName}
-    schema: schema.graphql
+          tableName: 'my-dynamo-table'
+    schema: 'schema.graphql'
 ```
 
-#### Create or Reuse APIs
+Reuse an existing AWS AppSync service by adding apiId to the inputs. This way the component will modify the AppSync service by those parts which are defined.
+
+```yml
+# serverless.yml
+
+myAppSync:
+  component: '@serverless/aws-app-sync'
+  inputs:
+    apiId: 'm3vv766ahnd6zgjofnri5djnmq'
+    mappingTemplates:
+      - dataSource: 'dynamodb_2_ds'
+        type: 'Query'
+        field: 'getMyField'
+        request: 'mapping-template-request.vtl'
+        response: 'mapping-template-response.vtl'
+    dataSources:
+      - type: 'AMAZON_DYNAMODB'
+        name: 'dynamodb_2_ds'
+        config:
+          tableName: 'my-dynamo-table'
+```
 
 #### Schema
 
 #### Authentication
+
+The app using AppSync API can use four different methods for authentication.
+* API_KEY - Api keys
+* AWS_IAM - IAM Permissions
+* OPENID_CONNECT - OpenID Connect provider
+* AMAZON_COGNITO_USER_POOLS - Amazon Cognito user pool
+
+When using OpenID connect method, inputs has to contain `openIDConnectConfig` block.
+
+```yaml
+myAppSync:
+  component: '@serverless/aws-app-sync'
+  inputs:
+    authenticationType: 'OPENID_CONNECT'
+    openIDConnectConfig:
+      issuer: 'NNN'
+      authTTL: '1234'
+      clientId: 'NNN'
+      iatTTL: '1234'
+```
+
+When using Amazon Cognito user pools, `userPoolConfig` has to be defined.
+
+```yaml
+myAppSync:
+  component: '@serverless/aws-app-sync'
+  inputs:
+    authenticationType: 'AMAZON_COGNITO_USER_POOLS'
+    userPoolConfig:
+      awsRegion: 'us-east-1'
+      defaultAction: 'ALLOW'
+      userPoolId: 'us-east-1_nnn'
+```
+
+ApiKey can be created and modified by defining `apiKeys`.
+
+```yaml
+myAppSync:
+  component: '@serverless/aws-app-sync'
+  inputs:
+    apiKeys:
+      - 'myApiKey1' # using default expiration data
+      - name: 'myApiKey2'
+        expires: 1609372800
+      - name: 'myApiKey3'
+        expires: '2020-12-31'
+```
 
 #### Data Sources
 
