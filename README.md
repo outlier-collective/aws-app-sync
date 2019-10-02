@@ -2,7 +2,7 @@
 
 # Serverless AppSync Component
 
-A full featured [Serverless Component](https://github.com/serverless/components) that instantly provisions an AppSync API on AWS.
+The AppSync [Serverless Component](https://github.com/serverless/components) allows you to easily and quickly deploy GraphQL APIs on AWS, and integrate them with AWS Lambda, DynamoDB & others. It supports all AWS AppSync features, while offering sane defaults that makes working with AppSync a lot easier without compromising on flexibility. 
 
 ## Features
 
@@ -24,6 +24,7 @@ A full featured [Serverless Component](https://github.com/serverless/components)
 1. [Install](#1-install)
 2. [Create](#2-create)
 3. [Configure](#3-configure)
+   - [Basic Configuration](#basic-configuration)
    - [Create or Reuse APIs](#create-or-reuse-apis)
    - [Schema](#schema)
    - [Authentication](#authentication)
@@ -44,6 +45,7 @@ Just create the following simple boilerplate:
 
 ```
 $ touch serverless.yml # more info in the "Configure" section below
+# touch schema.graphql # your graphql schema file
 $ touch .env           # your AWS api keys
 ```
 
@@ -55,9 +57,64 @@ AWS_SECRET_ACCESS_KEY=XXX
 
 ### 3. Configure
 
+#### Basic Configuration
+The following is a simple configuration that lets you get up and running quickly with a Lambda data source. Just add it to the `serverless.yml` file:
+
+
+```yml
+myLambda:
+  component: "@serverless/aws-lambda"
+  inputs:
+    handler: index.handler
+    code: ./
+
+myAppSyncApi:
+  component: "@serverless/aws-app-sync"
+  inputs:
+    # creating the API and an API key
+    name: Posts
+    authenticationType: API_KEY
+    apiKeys:
+      - myApiKey
+
+    # defining your lambda data source
+    dataSources:
+      - type: AWS_LAMBDA
+        name: getPost
+        config:
+          lambdaFunctionArn: ${myLambda.arn}
+
+    # mapping schema fields to the data source
+    mappingTemplates:
+      - dataSource: getPost
+        type: Query
+        field: getPost
+```
+This configuration works with the following example schema. Just add it to the `schema.graphql` file right next to `serverless.yml`:
+
+```
+schema {
+  query: Query
+}
+
+type Query {
+  getPost(id: ID!): Post
+}
+
+type Post {
+  id: ID!
+  author: String!
+  title: String
+  content: String
+  url: String
+}
+```
+
+For more advanced usage, keep reading!
+
 #### Create or Reuse APIs
 
-Create a new AWS AppSync service
+The AppSync component allows you to either create an AppSync API from scratch, or integrate with an existing one. Here's how to create a new API:
 
 ```yml
 # serverless.yml
@@ -65,7 +122,7 @@ Create a new AWS AppSync service
 myAppSync:
   component: '@serverless/aws-app-sync'
   inputs:
-    name: 'my-api-name'
+    name: 'my-api-name' # specifying a name creates a new API
     domain: api.example.com # example.com must be available in your AWS Route53
     authenticationType: 'API_KEY'
     apiKeys:
@@ -86,10 +143,10 @@ myAppSync:
         name: 'dynamodb_ds'
         config:
           tableName: 'my-dynamo-table'
-    schema: 'schema.graphql'
+    schema: 'schema.graphql' # optional. Default behavior would look for schema.graphql file in the cwd
 ```
 
-Reuse an existing AWS AppSync service by adding apiId to the inputs. This way the component will modify the AppSync service by those parts which are defined.
+Reuse an existing AWS AppSync service by adding replacing the `name` input with `apiId`. This way the component will modify the AppSync service by those parts which are defined.
 
 ```yml
 # serverless.yml
@@ -112,6 +169,33 @@ myAppSync:
 ```
 
 #### Schema
+You can define the schema of your GraphQL API by adding it to the `schema.graphql` file right next to `serverless.yml`. Here's a simple example schema:
+
+```
+schema {
+  query: Query
+}
+
+type Query {
+  getPost(id: ID!): Post
+}
+
+type Post {
+  id: ID!
+  author: String!
+  title: String
+  content: String
+  url: String
+}
+```
+
+Alternatively, if you have your schema file at a different location, you can specify the new location in `serverless.yml`
+
+```yml
+  inputs:
+    name: myGraphqlApi
+    schema: ./path/to/schema.graphql # specify your schema location
+```
 
 #### Authentication
 
