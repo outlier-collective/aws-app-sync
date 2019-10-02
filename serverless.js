@@ -29,6 +29,7 @@ class AwsAppSync extends Component {
     config.apiId = graphqlApi.apiId || config.apiId
     config.arn = graphqlApi.arn
     config.uris = graphqlApi.uris
+    config.isApiCreator = isNil(inputs.apiId)
 
     const awsIamRole = await this.load('@serverless/aws-iam-role')
     const serviceRole = await createServiceRole(awsIamRole, config, this.context.debug)
@@ -53,7 +54,7 @@ class AwsAppSync extends Component {
 
     this.state = pick(['arn', 'schemaChecksum', 'apiKeys', 'uris'], config)
     this.state.apiId = config.apiId
-    this.state.isApiCreator = isNil(inputs.apiId)
+    this.state.isApiCreator = config.isApiCreator
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
     this.state.mappingTemplates = map(pick(['type', 'field']), config.mappingTemplates)
     this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
