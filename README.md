@@ -25,13 +25,13 @@ The AppSync [Serverless Component](https://github.com/serverless/components) all
 2. [Create](#2-create)
 3. [Configure](#3-configure)
    - [Basic Configuration](#basic-configuration)
-   - [Create or Reuse APIs](#create-or-reuse-apis)
    - [Custom Domains](#custom-domains)
-   - [Schema](#schema)
+   - [Create or Reuse APIs](#create-or-reuse-apis)
    - [Authentication](#authentication)
-   - [Data Sources](#data-sources)
-   - [Mapping Templates](#mapping-templates)
+   - [Schema](#schema)
+   - [Data Sources & Mapping Templates](#data-sourcesmapping-templates)
    - [Functions](#functions)
+
 4. [Deploy](#4-deploy)
 
 ## 1. Install
@@ -140,6 +140,22 @@ exports.handler = async event => {
 
 For more advanced usage, keep reading!
 
+### Custom Domains
+You could optionally specify a custom domain for your GraphQL API, just add a domain property to the app sync component inputs:
+
+```yml
+myAppSyncApi:
+  component: "@serverless/aws-app-sync"
+  inputs:
+    domain: api.example.com # add your custom domain here
+    name: Posts
+    # ... rest of config here
+
+```
+This would create a CloudFront distribution (aka CDN) for your AppSync API, which reduces request latency significantly, and would give you an SSL certificate out of the box powered by AWS ACM.
+
+Please note that your domain (example.com in this example) must have been purchased via AWS Route53 and available in your AWS account. For advanced users, you may also purchase it elsewhere, then configure the name servers to point to an AWS Route53 hosted zone. How you do that depends on your registrar.
+
 ### Create or Reuse APIs
 
 The AppSync component allows you to either create an AppSync API from scratch, or integrate with an existing one. Here's how to create a new API:
@@ -196,51 +212,6 @@ myAppSync:
           tableName: 'my-dynamo-table'
 ```
 
-### Custom Domains
-You could optionally specify a custom domain for your GraphQL API, just add a domain property to the app sync component inputs:
-
-```yml
-myAppSyncApi:
-  component: "@serverless/aws-app-sync"
-  inputs:
-    domain: api.example.com # add your custom domain here
-    name: Posts
-    # ... rest of config here
-
-```
-This would create a CloudFront distribution (aka CDN) for your AppSync API, which reduces request latency significantly, and would give you an SSL certificate out of the box powered by AWS ACM.
-
-Please note that your domain (example.com in this example) must have been purchased via AWS Route53 and available in your AWS account. For advanced users, you may also purchase it elsewhere, then configure the name servers to point to an AWS Route53 hosted zone. How you do that depends on your registrar.
-
-### Schema
-You can define the schema of your GraphQL API by adding it to the `schema.graphql` file right next to `serverless.yml`. Here's a simple example schema:
-
-```
-schema {
-  query: Query
-}
-
-type Query {
-  getPost(id: ID!): Post
-}
-
-type Post {
-  id: ID!
-  author: String!
-  title: String
-  content: String
-  url: String
-}
-```
-
-Alternatively, if you have your schema file at a different location, you can specify the new location in `serverless.yml`
-
-```yml
-  inputs:
-    name: myGraphqlApi
-    schema: ./path/to/schema.graphql # specify your schema location
-```
-
 ### Authentication
 
 The app using AppSync API can use four different methods for authentication.
@@ -291,8 +262,37 @@ myAppSync:
         expires: '2020-12-31'
 ```
 
-### Data Sources
-The AppSync component supports 4 AppSync data sources:
+### Schema
+You can define the schema of your GraphQL API by adding it to the `schema.graphql` file right next to `serverless.yml`. Here's a simple example schema:
+
+```
+schema {
+  query: Query
+}
+
+type Query {
+  getPost(id: ID!): Post
+}
+
+type Post {
+  id: ID!
+  author: String!
+  title: String
+  content: String
+  url: String
+}
+```
+
+Alternatively, if you have your schema file at a different location, you can specify the new location in `serverless.yml`
+
+```yml
+  inputs:
+    name: myGraphqlApi
+    schema: ./path/to/schema.graphql # specify your schema location
+```
+
+### Data Sources & Mapping Templates
+The AppSync component supports 4 AppSync data sources and their corresponding mapping templates:
 
 #### Lambda Data Source
 You could add as many Lambda data sources as your application needs. For each field (or operation) in your Schema (ie. `getPost`), you'll need to add a mapping template that maps to a data source, which maps to a certain lambda ARN.
@@ -346,8 +346,6 @@ myAppSyncApi:
 #### ElasticSearch Data Source
 
 #### Relational Database Data Source
-
-### Mapping Templates
 
 ### Functions
 
