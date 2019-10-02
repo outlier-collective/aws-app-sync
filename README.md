@@ -291,7 +291,7 @@ Alternatively, if you have your schema file at a different location, you can spe
     schema: ./path/to/schema.graphql # specify your schema location
 ```
 
-### Data Sources & Mapping Templates
+### Data Sources & Templates
 The AppSync component supports 4 AppSync data sources and their corresponding mapping templates:
 
 #### Lambda Data Source
