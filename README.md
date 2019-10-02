@@ -293,9 +293,12 @@ Alternatively, if you have your schema file at a different location, you can spe
 ### Data Sources & Templates
 The AppSync component supports 4 AppSync data sources and their corresponding mapping templates. You could add as many data sources as your application needs. For each field (or operation) in your Schema (ie. `getPost`), you'll need to add a mapping template that maps to a data source.
 
-Here are the data sources that are supported
+Here are the data sources that are supported:
 
 #### Lambda Data Source
+Here's an example setup for a Lambda data source:
+
+**serverless.yml**
 
 ```yml
 myLambda:
@@ -339,7 +342,141 @@ myAppSyncApi:
         response: response.vtl
 ```
 
+**index.js**
+
+```js
+exports.handler = async (event) => {
+  var posts = {
+    '1': {
+      id: '1',
+      title: 'First Blog Post',
+      author: 'Eetu Tuomala',
+      url: 'https://serverless.com/',
+      content:
+        "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s."
+    },
+    '2': {
+      id: '2',
+      title: 'Second Blog Post',
+      author: 'Siddharth Gupta',
+      url: 'https://serverless.com',
+      content:
+        "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s."
+    }
+  }
+
+  return posts[event.id]
+}
+
+
+```
+
+**schema.graphql**
+
+```
+schema {
+  query: Query
+}
+
+type Query {
+  getPost(id: ID!): Post
+}
+
+type Post {
+  id: ID!
+  author: String!
+  title: String
+  content: String
+  url: String
+}
+
+```
+
 #### DynamoDB Data Source
+For the DynamoDB data source, you'll need to provide your own request/response templates that works according to your schema. Here's an example setup:
+
+**serverless.yml**
+
+```yml
+
+# create a table with the aws-dynamodb component
+myTable:
+  component: '@serverless/aws-dynamodb'
+
+appsync:
+  component: '@serverless/aws-app-sync'
+  inputs:
+    name: Posts
+    authenticationType: API_KEY
+    apiKeys:
+      - myApiKey
+    dataSources:
+      - type: AMAZON_DYNAMODB
+        name: Posts
+        config:
+          tableName: ${myTable.name}
+    mappingTemplates:
+      - dataSource: Posts
+        type: Mutation
+        field: addPost
+        request: request.vtl
+        response: response.vtl
+```
+
+**request.vtl**
+
+```
+{
+    "version" : "2017-02-28",
+    "operation" : "PutItem",
+    "key" : {
+        "id" : { "S" : "${context.arguments.id}" }
+    },
+    "attributeValues" : {
+        "author": { "S" : "${context.arguments.author}" },
+        "title": { "S" : "${context.arguments.title}" },
+        "content": { "S" : "${context.arguments.content}" },
+        "url": { "S" : "${context.arguments.url}" },
+        "ups" : { "N" : 1 },
+        "downs" : { "N" : 0 },
+        "version" : { "N" : 1 }
+    }
+}
+```
+
+**response.vtl**
+```
+$util.toJson($context.result)
+```
+
+**shema.graphql**
+
+```
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  getPost(id: ID): Post
+}
+
+type Mutation {
+  addPost(id: ID!, author: String!, title: String!, content: String!, url: String!): Post!
+}
+
+type Post {
+  id: ID!
+  author: String
+  title: String
+  content: String
+  url: String
+  ups: Int!
+  downs: Int!
+  version: Int!
+}
+
+```
 
 #### ElasticSearch Data Source
 
