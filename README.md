@@ -31,7 +31,6 @@ The AppSync [Serverless Component](https://github.com/serverless/components) all
    - [Schema Configuration](#schema)
    - [Data Sources & Templates](#data-sources--templates)
    - [Functions](#functions)
-
 4. [Deploy](#4-deploy)
 
 ## 1. Install
