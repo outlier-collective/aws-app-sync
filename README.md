@@ -1,3 +1,5 @@
+![Serverless AppSync Component](https://s3.amazonaws.com/assets.general.serverless.com/component_appsync/readme-appsync-serverless-component.gif)
+
 # AWS AppSync Component
 
 A full featured [Serverless Component](https://github.com/serverless/components) that instantly provisions an AppSync API on AWS.
@@ -20,12 +22,12 @@ A full featured [Serverless Component](https://github.com/serverless/components)
 1. [Install](#1-install)
 2. [Create](#2-create)
 3. [Configure](#3-configure)
-    - [Create or Reuse APIs](#create-or-reuse-apis)
-    - [Schema](#schema)
-    - [Authentication](#authentication)
-    - [Data Sources](#data-sources)
-    - [Mapping Templates](#mapping-templates)
-    - [Functions](#functions)
+   - [Create or Reuse APIs](#create-or-reuse-apis)
+   - [Schema](#schema)
+   - [Authentication](#authentication)
+   - [Data Sources](#data-sources)
+   - [Mapping Templates](#mapping-templates)
+   - [Functions](#functions)
 4. [Deploy](#4-deploy)
 
 ### 1. Install
@@ -111,10 +113,11 @@ myAppSync:
 #### Authentication
 
 The app using AppSync API can use four different methods for authentication.
-* API_KEY - Api keys
-* AWS_IAM - IAM Permissions
-* OPENID_CONNECT - OpenID Connect provider
-* AMAZON_COGNITO_USER_POOLS - Amazon Cognito user pool
+
+- API_KEY - Api keys
+- AWS_IAM - IAM Permissions
+- OPENID_CONNECT - OpenID Connect provider
+- AMAZON_COGNITO_USER_POOLS - Amazon Cognito user pool
 
 When using OpenID connect method, inputs has to contain `openIDConnectConfig` block.
 
