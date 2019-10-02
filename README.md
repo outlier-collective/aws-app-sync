@@ -33,19 +33,20 @@ The AppSync [Serverless Component](https://github.com/serverless/components) all
    - [Functions](#functions)
 4. [Deploy](#4-deploy)
 
-### 1. Install
+## 1. Install
 
 ```shell
 $ npm install -g serverless
 ```
 
-### 2. Create
+## 2. Create
 
 Just create the following simple boilerplate:
 
 ```
 $ touch serverless.yml # more info in the "Configure" section below
-# touch schema.graphql # your graphql schema file
+$ touch schema.graphql # your graphql schema file
+$ touch index.js       # only required if you use a Lambda data source 
 $ touch .env           # your AWS api keys
 ```
 
@@ -55,9 +56,9 @@ AWS_ACCESS_KEY_ID=XXX
 AWS_SECRET_ACCESS_KEY=XXX
 ```
 
-### 3. Configure
+## 3. Configure
 
-#### Basic Configuration
+### Basic Configuration
 The following is a simple configuration that lets you get up and running quickly with a Lambda data source. Just add it to the `serverless.yml` file:
 
 
@@ -109,10 +110,36 @@ type Post {
   url: String
 }
 ```
+You'll also need to add the following handler code for this example to work:
+
+```js
+exports.handler = async event => {
+  var posts = {
+    "1": {
+      id: "1",
+      title: "First Blog Post",
+      author: "Eetu Tuomala",
+      url: "https://serverless.com/",
+      content:
+        "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s."
+    },
+    "2": {
+      id: "2",
+      title: "Second Blog Post",
+      author: "Siddharth Gupta",
+      url: "https://serverless.com",
+      content:
+        "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s."
+    }
+  };
+
+  return posts[event.id];
+};
+```
 
 For more advanced usage, keep reading!
 
-#### Create or Reuse APIs
+### Create or Reuse APIs
 
 The AppSync component allows you to either create an AppSync API from scratch, or integrate with an existing one. Here's how to create a new API:
 
@@ -168,7 +195,7 @@ myAppSync:
           tableName: 'my-dynamo-table'
 ```
 
-#### Schema
+### Schema
 You can define the schema of your GraphQL API by adding it to the `schema.graphql` file right next to `serverless.yml`. Here's a simple example schema:
 
 ```
@@ -197,7 +224,7 @@ Alternatively, if you have your schema file at a different location, you can spe
     schema: ./path/to/schema.graphql # specify your schema location
 ```
 
-#### Authentication
+### Authentication
 
 The app using AppSync API can use four different methods for authentication.
 
@@ -247,20 +274,46 @@ myAppSync:
         expires: '2020-12-31'
 ```
 
-#### Data Sources
+### Data Sources
+The AppSync component supports 4 AppSync data sources:
 
-#### Mapping Templates
+#### Lambda Data Source
 
-#### Functions
+#### DynamoDB Data Source
 
-### 4. Deploy
+#### ElasticSearch Data Source
+
+#### Relational Database Data Source
+
+### Mapping Templates
+
+### Functions
+
+## 4. Deploy
+To deploy, just run the following command in the directory containing your `serverless.yml file`:
 
 ```shell
 $ serverless
 ```
 
+After few seconds (up to a minute if it's your first deployment), you should see an output like this:
+
+```
+  myAppSyncApi:
+    apiId:   samrhyo7srbtvkpqnj4j6uq6gq
+    arn:     arn:aws:appsync:us-east-1:552751238299:apis/samrhyo7srbtvkpqnj4j6uq6gq
+    url:     "https://samrhyo7srbtvkpqnj4j6uq6gq.appsync-api.us-east-1.amazonaws.com/graphql"
+    apiKeys:
+      - da2-coeytoubhffnfastengavajsku
+    domain:  "https://api.example.com/graphql"
+
+  9s › myAppSyncApi › done
+
+myApp (master)$
+```
+
 &nbsp;
 
-### New to Components?
+## New to Components?
 
 Checkout the [Serverless Components](https://github.com/serverless/components) repo for more information.
