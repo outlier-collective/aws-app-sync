@@ -291,12 +291,11 @@ Alternatively, if you have your schema file at a different location, you can spe
 ```
 
 ### Data Sources & Templates
-The AppSync component supports 4 AppSync data sources and their corresponding mapping templates:
+The AppSync component supports 4 AppSync data sources and their corresponding mapping templates. You could add as many data sources as your application needs. For each field (or operation) in your Schema (ie. `getPost`), you'll need to add a mapping template that maps to a data source.
+
+Here are the data sources that are supported
 
 #### Lambda Data Source
-You could add as many Lambda data sources as your application needs. For each field (or operation) in your Schema (ie. `getPost`), you'll need to add a mapping template that maps to a data source, which maps to a certain lambda ARN.
-
-Here's an example...
 
 ```yml
 myLambda:
