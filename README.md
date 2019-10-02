@@ -26,6 +26,7 @@ The AppSync [Serverless Component](https://github.com/serverless/components) all
 3. [Configure](#3-configure)
    - [Basic Configuration](#basic-configuration)
    - [Create or Reuse APIs](#create-or-reuse-apis)
+   - [Custom Domains](#custom-domains)
    - [Schema](#schema)
    - [Authentication](#authentication)
    - [Data Sources](#data-sources)
@@ -194,6 +195,22 @@ myAppSync:
         config:
           tableName: 'my-dynamo-table'
 ```
+
+### Custom Domains
+You could optionally specify a custom domain for your GraphQL API, just add a domain property to the app sync component inputs:
+
+```yml
+myAppSyncApi:
+  component: "@serverless/aws-app-sync"
+  inputs:
+    domain: api.example.com # add your custom domain here
+    name: Posts
+    # ... rest of config here
+
+```
+This would create a CloudFront distribution (aka CDN) for your AppSync API, which reduces request latency significantly, and would give you an SSL certificate out of the box powered by AWS ACM.
+
+Please note that your domain (example.com in this example) must have been purchased via AWS Route53 and available in your AWS account. For advanced users, you may also purchase it elsewhere, then configure the name servers to point to an AWS Route53 hosted zone. How you do that depends on your registrar.
 
 ### Schema
 You can define the schema of your GraphQL API by adding it to the `schema.graphql` file right next to `serverless.yml`. Here's a simple example schema:
