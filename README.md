@@ -1,13 +1,15 @@
 ![Serverless AppSync Component](https://s3.amazonaws.com/assets.general.serverless.com/component_appsync/readme-appsync-serverless-component.gif)
 
-# AWS AppSync Component
+# Serverless AppSync Component
 
 A full featured [Serverless Component](https://github.com/serverless/components) that instantly provisions an AppSync API on AWS.
 
 ## Features
 
-- [x] Deploys in ~10 Seconds
-- [x] Creates New APIs or Reuse Existing Ones
+- [x] Fast Deployments (~10 seconds on average)
+- [x] Create New APIs or Reuse Existing Ones
+- [x] Supports Custom Domains with CDN & SSL Out of the Box
+- [x] Supports Custom AppSync Service Role
 - [x] Supports Lambda Data Source
 - [x] Supports DynamoDB Data Source
 - [x] Supports ElasticSearch Data Source
@@ -64,6 +66,7 @@ myAppSync:
   component: '@serverless/aws-app-sync'
   inputs:
     name: 'my-api-name'
+    domain: api.example.com # example.com must be available in your AWS Route53
     authenticationType: 'API_KEY'
     apiKeys:
       - 'myApiKey'
