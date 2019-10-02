@@ -75,7 +75,7 @@ class AwsAppSync extends Component {
       const domainInputs = {
         domain: secondLevelDomain,
         subdomains: {},
-        region: inputs.region
+        region: config.region
       }
 
       domainInputs.subdomains[subdomain] = output
