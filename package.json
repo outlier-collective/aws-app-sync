@@ -1,6 +1,6 @@
 {
   "name": "@serverless/aws-app-sync",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "main": "./serverless.js",
   "publishConfig": {
     "access": "public"
@@ -14,6 +14,7 @@
   "dependencies": {
     "@serverless/aws-iam-role": "^1.0.0",
     "@serverless/core": "^1.0.0",
+    "@serverless/domain": "^6.0.8",
     "aws-sdk": "^2.0.0",
     "ramda": "^0.26.1"
   },

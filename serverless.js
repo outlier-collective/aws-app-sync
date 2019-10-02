@@ -60,14 +60,36 @@ class AwsAppSync extends Component {
     this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
     await this.save()
 
-    let output = {
-      graphqlApi: pick(['apiId', 'arn', 'uris'], config)
+    let output = pick(['apiId', 'arn', 'uris'], config)
+
+    // Eslam - temporarly output a single url
+    output.url = output.uris.GRAPHQL
+    delete output.uris
+
+    if (inputs.domain) {
+      this.context.debug(`Setting domain ${inputs.domain} for AppSync API ${output.apiId}.`)
+      const domain = await this.load('@serverless/domain', 'apiDomain')
+      const subdomain = inputs.domain.split('.')[0]
+      const secondLevelDomain = inputs.domain.replace(`${subdomain}.`, '')
+
+      const domainInputs = {
+        domain: secondLevelDomain,
+        subdomains: {},
+        region: inputs.region
+      }
+
+      domainInputs.subdomains[subdomain] = output
+      const domainOutputs = await domain(domainInputs)
+
+      output.domain = `${domainOutputs.domains[0]}/graphql`
     }
+
     if (not(isNil(config.apiKeys)) && not(isEmpty(config.apiKeys))) {
       output = merge(output, {
         apiKeys: map(({ id }) => id, config.apiKeys)
       })
     }
+
     return output
   }
 
@@ -105,6 +127,10 @@ class AwsAppSync extends Component {
     }
     const awsIamRole = await this.load('@serverless/aws-iam-role')
     await awsIamRole.remove()
+
+    const domain = await this.load('@serverless/domain', 'apiDomain')
+    await domain.remove()
+
     this.state = {}
     await this.save()
   }
