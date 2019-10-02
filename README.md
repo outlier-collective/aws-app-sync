@@ -295,6 +295,51 @@ myAppSync:
 The AppSync component supports 4 AppSync data sources:
 
 #### Lambda Data Source
+You could add as many Lambda data sources as your application needs. For each field (or operation) in your Schema (ie. `getPost`), you'll need to add a mapping template that maps to a data source, which maps to a certain lambda ARN.
+
+Here's an example...
+
+```yml
+myLambda:
+  component: "@serverless/aws-lambda"
+  inputs:
+    handler: index.handler
+    code: ./
+
+myAppSyncApi:
+  component: "@serverless/aws-app-sync"
+  inputs:
+    # creating the API and an API key
+    name: Posts
+    authenticationType: API_KEY
+    apiKeys:
+      - myApiKey
+
+    # defining your lambda data source
+    dataSources:
+      - type: AWS_LAMBDA
+        name: getPost
+        config:
+          lambdaFunctionArn: ${myLambda.arn} # pass the lambda arn from the aws-lambda component above
+      - type: AWS_LAMBDA
+        name: addPost
+        config:
+          lambdaFunctionArn: ${myLambda.arn} # you could pass another lambda ARN, or the same one if it handles that field
+
+    # mapping schema fields to the data source
+    mappingTemplates:
+      - dataSource: getPost
+        type: Query
+        field: getPost
+      - dataSource: addPost
+        type: Mutation
+        field: addPost
+
+        # Minimal request/response templates are added by default that works for 99% of use cases.
+        # But you could also overwrite them with your own templates by specifying the path to the template files
+        request: request.vtl
+        response: response.vtl
+```
 
 #### DynamoDB Data Source
 
