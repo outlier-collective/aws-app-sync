@@ -449,7 +449,7 @@ appsync:
 $util.toJson($context.result)
 ```
 
-**shema.graphql**
+**schema.graphql**
 
 ```
 schema {
