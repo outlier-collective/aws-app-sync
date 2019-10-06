@@ -2,7 +2,7 @@
 
 # Serverless AppSync Component
 
-The AppSync [Serverless Component](https://github.com/serverless/components) allows you to easily and quickly deploy GraphQL APIs on AWS, and integrate them with AWS Lambda, DynamoDB & others. It supports all AWS AppSync features, while offering sane defaults that makes working with AppSync a lot easier without compromising on flexibility. 
+The AppSync [Serverless Component](https://github.com/serverless/components) allows you to easily and quickly deploy GraphQL APIs on AWS, and integrate them with AWS Lambda, DynamoDB & others. It supports all AWS AppSync features, while offering sane defaults that makes working with AppSync a lot easier without compromising on flexibility.
 
 ## Features
 
@@ -46,7 +46,7 @@ Just create the following simple boilerplate:
 ```
 $ touch serverless.yml # more info in the "Configure" section below
 $ touch schema.graphql # your graphql schema file
-$ touch index.js       # only required if you use a Lambda data source 
+$ touch index.js       # only required if you use a Lambda data source
 $ touch .env           # your AWS api keys
 ```
 
@@ -93,7 +93,7 @@ myAppSyncApi:
 ```
 This configuration works with the following example schema. Just add it to the `schema.graphql` file right next to `serverless.yml`:
 
-```
+```graphql
 schema {
   query: Query
 }
@@ -264,7 +264,7 @@ myAppSync:
 ### Schema
 You can define the schema of your GraphQL API by adding it to the `schema.graphql` file right next to `serverless.yml`. Here's a simple example schema:
 
-```
+```graphql
 schema {
   query: Query
 }
@@ -373,7 +373,7 @@ exports.handler = async (event) => {
 
 **schema.graphql**
 
-```
+```graphql
 schema {
   query: Query
 }
@@ -451,7 +451,7 @@ $util.toJson($context.result)
 
 **schema.graphql**
 
-```
+```graphql
 schema {
   query: Query
   mutation: Mutation
@@ -481,6 +481,87 @@ type Post {
 #### ElasticSearch Data Source
 
 #### Relational Database Data Source
+
+This example is using an Amazon Aurora Serverless cluster with PostgreSQL database which is already running in AWS.
+
+The database has two tables, `authors` table, which contains an `id` and a `fullname` columns, and `posts` table which contains following columns `id`, `title`, `content`, `url`, and a foreign key `fk_authors_id`.
+
+**serverless.yml**
+
+```yaml
+myAppSyncApi:
+  component: "@serverless/aws-app-sync"
+  inputs:
+    # creating the API and an API key
+    name: Posts
+    authenticationType: API_KEY
+    apiKeys:
+      - myApiKey
+
+    # Relational database datasource has to be an Amazon Aurora Serverless Cluster with Data API enabled
+    # https://docs.aws.amazon.com/appsync/latest/devguide/tutorial-rds-resolvers.html
+    dataSources:
+      - type: RELATIONAL_DATABASE
+        name: Posts
+        config:
+          awsSecretStoreArn: 'arn:aws:secretsmanager:us-east-1:123456789123:secret:rds-db-credentials/cluster-ABCDEFGHI/admin-aBc1e2'
+          databaseName: 'mydatabase'
+          dbClusterIdentifier: 'arn:aws:rds:us-east-1:123456789123:cluster:my-serverless-aurora-postgres-1'
+          schema: 'public'
+
+    mappingTemplates:
+      - dataSource: Posts
+        type: Query
+        field: getPost
+        request: request.vtl
+        response: response.vtl
+```
+
+**request.vtl**
+
+```
+{
+    "version": "2018-05-29",
+    "statements": [
+        "select posts.id, posts.title, posts.content, posts.url, authors.fullname as author from posts, authors where authors.id = posts.fk_authors_id and posts.id = '$ctx.args.id'"
+    ]
+}
+```
+
+**response.vtl**
+```
+#if($ctx.error)
+    $utils.error($ctx.error.message, $ctx.error.type)
+#end
+
+$utils.toJson($utils.rds.toJsonObject($ctx.result)[0][0])
+```
+
+**schema.graphql**
+
+```graphql
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  getPost(id: ID): Post
+}
+
+type Mutation {
+  addPost(fk_authors_id: Int!, title: String!, content: String!, url: String!): Post!
+}
+
+type Post {
+  id: ID!
+  author: String
+  fk_authors_id: Int
+  title: String
+  content: String
+  url: String
+}
+```
 
 ### Functions
 
