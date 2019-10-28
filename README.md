@@ -480,6 +480,104 @@ type Post {
 
 #### ElasticSearch Data Source
 
+This example uses Amazon ElasticSearch Service running in AWS. The cluster contains ElasticSearch/Kibana sample flight data https://www.elastic.co/guide/en/kibana/current/tutorial-sample-data.html.
+
+**serverless.yml**
+
+```yaml
+myAppSyncApi:
+  component: "@serverless/aws-app-sync"
+  inputs:
+    # creating the API and an API key
+    name: Flights
+    authenticationType: API_KEY
+    apiKeys:
+      - myApiKey
+
+    dataSources:
+      - type: AMAZON_ELASTICSEARCH
+        name: Flights
+        config:
+          endpoint: https://search-my-sample-data-abbaabba.us-east-1.es.amazonaws.com
+
+    mappingTemplates:
+      - dataSource: Flights
+        type: Query
+        field: getFlights
+        request: request.vtl
+        response: response.vtl
+```
+
+**request.vtl**
+
+The resolver returns 50 latest flights.
+
+```
+{
+    "version":"2017-02-28",
+    "operation":"GET",
+    "path":"/kibana_sample_data_flights/_doc/_search",
+    "params":{
+        "body": {
+            "from": 0,
+            "size": 50,
+            "query": {
+                "match_all": {}
+            }
+        }
+    }
+}
+```
+
+**response.vtl**
+
+```
+[
+    #foreach($entry in $context.result.hits.hits)
+        ## $velocityCount starts at 1 and increments with the #foreach loop **
+        #if( $velocityCount > 1 ) , #end
+        $util.toJson($entry.get("_source"))
+    #end
+]
+```
+
+**schema.graphql**
+
+```graphql
+type Flight {
+	FlightNum: String
+	DestAirportID: String
+	OriginAirportID: String
+}
+
+type Query {
+	getFlights: [Flight]
+}
+
+schema {
+	query: Query
+}
+```
+
+After deployment, update ElasticSearch access policy to allow created role by adding following block to statement array.
+
+```json
+{
+  "Effect": "Allow",
+  "Principal": {
+    "AWS": "arn:aws:iam::123456789012:role/created-role" <- replace with correct role
+  },
+  "Action": [
+    "es:ESHttpDelete",
+    "es:ESHttpHead",
+    "es:ESHttpGet",
+    "es:ESHttpPost",
+    "es:ESHttpPut"
+  ],
+  "Resource": "arn:aws:es:us-east-1:123456789012:domain/my-sample-data/*" <- replace with correct ElasticSearch domain
+}
+```
+
 #### Relational Database Data Source
 
 This example is using an Amazon Aurora Serverless cluster with PostgreSQL database which is already running in AWS.
