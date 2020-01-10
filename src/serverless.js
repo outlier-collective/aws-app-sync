@@ -24,15 +24,16 @@ const defaults = {
 class AwsAppSync extends Component {
   async deploy(inputs = {}) {
     const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
+    config.src = inputs.src
     const { appSync } = getClients(this.credentials.aws, config.region)
-    const graphqlApi = await createOrUpdateGraphqlApi(appSync, config, this.debug)
+    const graphqlApi = await createOrUpdateGraphqlApi(appSync, config, this)
     config.apiId = graphqlApi.apiId || config.apiId
     config.arn = graphqlApi.arn
     config.uris = graphqlApi.uris
     config.isApiCreator = isNil(inputs.apiId)
 
-    const awsIamRole = this.load('aws-iam-role', 'role')
-    const serviceRole = await createServiceRole(awsIamRole, config, this.debug)
+    const awsIamRole = this.load('aws-iam-role@0.0.4', 'role')
+    const serviceRole = await createServiceRole(awsIamRole, config, this)
 
     config.dataSources = map((datasource) => {
       if (isNil(datasource.serviceRoleArn)) {
@@ -41,16 +42,16 @@ class AwsAppSync extends Component {
       return datasource
     }, config.dataSources || [])
 
-    config.dataSources = await createOrUpdateDataSources(appSync, config, this.debug)
-    config.schemaChecksum = await createSchema(appSync, config, this.state, this.debug)
-    config.mappingTemplates = await createOrUpdateResolvers(appSync, config, this.debug)
-    config.functions = await createOrUpdateFunctions(appSync, config, this.debug)
-    config.apiKeys = await createOrUpdateApiKeys(appSync, config, this.state, this.debug)
+    config.dataSources = await createOrUpdateDataSources(appSync, config, this)
+    config.schemaChecksum = await createSchema(appSync, config, this.state, this)
+    config.mappingTemplates = await createOrUpdateResolvers(appSync, config, this)
+    config.functions = await createOrUpdateFunctions(appSync, config, this)
+    config.apiKeys = await createOrUpdateApiKeys(appSync, config, this.state, this)
 
-    await removeObsoleteResolvers(appSync, config, this.state, this.debug)
-    await removeObsoleteFunctions(appSync, config, this.state, this.debug)
-    await removeObsoleteDataSources(appSync, config, this.state, this.debug)
-    await removeObsoleteApiKeys(appSync, config, this.state, this.debug)
+    await removeObsoleteResolvers(appSync, config, this.state, this)
+    await removeObsoleteFunctions(appSync, config, this.state, this)
+    await removeObsoleteDataSources(appSync, config, this.state, this)
+    await removeObsoleteApiKeys(appSync, config, this.state, this)
 
     this.state = pick(['arn', 'schemaChecksum', 'apiKeys', 'uris'], config)
     this.state.apiId = config.apiId
@@ -118,11 +119,7 @@ class AwsAppSync extends Component {
         this.state,
         this.debug
       )
-      await removeObsoleteApiKeys(
-        appSync,
-        { apiId: this.state.apiId, apiKeys: [] },
-        this.debug
-      )
+      await removeObsoleteApiKeys(appSync, { apiId: this.state.apiId, apiKeys: [] }, this.debug)
     } else {
       await removeGraphqlApi(appSync, { apiId: this.state.apiId })
     }

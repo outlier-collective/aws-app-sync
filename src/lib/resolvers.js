@@ -1,3 +1,4 @@
+const path = require('path')
 const { checkForDuplicates, defaultToAnArray, equalsByKeys, listAll, readIfFile } = require('.')
 const { difference, equals, find, isNil, map, not, flatten, merge, pick, pipe } = require('ramda')
 
@@ -8,7 +9,7 @@ const { difference, equals, find, isNil, map, not, flatten, merge, pick, pipe } 
  * @param {Function} debug
  * @return {Object} - deployed resolvers
  */
-const createOrUpdateResolvers = async (appSync, config, debug) => {
+const createOrUpdateResolvers = async (appSync, config, instance) => {
   checkForDuplicates(['dataSource', 'type', 'field'], defaultToAnArray(config.mappingTemplates))
   const deployedResolvers = pipe(
     flatten,
@@ -36,8 +37,12 @@ const createOrUpdateResolvers = async (appSync, config, debug) => {
 
   const resolversWithTemplates = await Promise.all(
     map(async (resolver) => {
-      let requestMappingTemplate = await readIfFile(resolver.request)
-      let responseMappingTemplate = await readIfFile(resolver.response)
+      // let requestMappingTemplate = await readIfFile(resolver.request)
+      // let responseMappingTemplate = await readIfFile(resolver.response)
+      // let requestMappingTemplate = await readIfFile(path.join(config.src, resolver.request))
+      // let responseMappingTemplate = await readIfFile(path.join(config.src, resolver.response))
+      let requestMappingTemplate = null
+      let responseMappingTemplate = null
 
       if (isNil(requestMappingTemplate) || isNil(responseMappingTemplate)) {
         const { dataSource } = await appSync
@@ -85,10 +90,10 @@ const createOrUpdateResolvers = async (appSync, config, debug) => {
         pipelineConfig: resolver.pipelineConfig
       }
       if (equals(resolver.mode, 'create')) {
-        debug(`Creating resolver ${resolver.field}/${resolver.type}`)
+        await instance.debug(`Creating resolver ${resolver.field}/${resolver.type}`)
         await appSync.createResolver(params).promise()
       } else if (equals(resolver.mode, 'update')) {
-        debug(`Updating resolver ${resolver.field}/${resolver.type}`)
+        await instance.debug(`Updating resolver ${resolver.field}/${resolver.type}`)
         await appSync.updateResolver(params).promise()
       }
       return Promise.resolve(resolver)
@@ -103,14 +108,14 @@ const createOrUpdateResolvers = async (appSync, config, debug) => {
  * @param {Object} state
  * @param {Function} debug
  */
-const removeObsoleteResolvers = async (appSync, config, state, debug) => {
+const removeObsoleteResolvers = async (appSync, config, state, instance) => {
   const obsoleteResolvers = difference(
     defaultToAnArray(state.mappingTemplates),
     map(pick(['type', 'field']), defaultToAnArray(config.mappingTemplates))
   )
   await Promise.all(
     map(async (resolver) => {
-      debug(`Removing resolver ${resolver.field}/${resolver.type}`)
+      await instance.debug(`Removing resolver ${resolver.field}/${resolver.type}`)
       try {
         await appSync
           .deleteResolver({
@@ -123,7 +128,7 @@ const removeObsoleteResolvers = async (appSync, config, state, debug) => {
         if (not(equals(error.code, 'NotFoundException'))) {
           throw error
         }
-        debug(`Resolver ${resolver.field}/${resolver.type} already removed`)
+        await instance.debug(`Resolver ${resolver.field}/${resolver.type} already removed`)
       }
     }, obsoleteResolvers)
   )

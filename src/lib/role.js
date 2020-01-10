@@ -11,7 +11,38 @@ const {
   pipe,
   reduce
 } = require('ramda')
-const { getAccountId, defaultToAnArray } = require('.')
+const { getAccountId, defaultToAnArray, sleep } = require('.')
+
+const createRole = async (clients, roleName) => {
+  const assumeRolePolicyDocument = {
+    Version: '2012-10-17',
+    Statement: {
+      Effect: 'Allow',
+      Principal: {
+        Service: ['appsync.amazonaws.com']
+      },
+      Action: 'sts:AssumeRole'
+    }
+  }
+  const res = await clients.iam
+    .createRole({
+      RoleName: roleName,
+      Path: '/',
+      AssumeRolePolicyDocument: JSON.stringify(assumeRolePolicyDocument)
+    })
+    .promise()
+
+  await clients.iam
+    .attachRolePolicy({
+      RoleName: roleName,
+      PolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess'
+    })
+    .promise()
+
+  await sleep(10000)
+
+  return { name: res.Role.RoleName, arn: res.Role.Arn }
+}
 
 /**
  * Create service role
@@ -20,7 +51,7 @@ const { getAccountId, defaultToAnArray } = require('.')
  * @param {Function} debug
  * @return {Object} - deployed service role
  */
-const createServiceRole = async (awsIamRole, config, debug) => {
+const createServiceRole = async (awsIamRole, config, instance) => {
   const accountId = await getAccountId()
   const statements = pipe(
     reduce((acc, dataSource) => {
@@ -157,22 +188,23 @@ const createServiceRole = async (awsIamRole, config, debug) => {
     flatten
   )(defaultToAnArray(config.dataSources))
   if (not(isEmpty(statements))) {
-    debug('Create/update service role')
-    const role = await awsIamRole({
+    await instance.debug('Create/update service role')
+    const role = await awsIamRole.deploy({
       service: 'appsync.amazonaws.com',
       policy: {
         Version: '2012-10-17',
-        Statement: statements
+        Statement: statements,
+        arn: 'arn:aws:iam::aws:policy/AdministratorAccess' // todo remove this
       },
       region: config.region
     })
     return role
-  } else {
-    await awsIamRole.remove()
-    return {}
   }
+  await awsIamRole.remove()
+  return {}
 }
 
 module.exports = {
-  createServiceRole
+  createServiceRole,
+  createRole
 }

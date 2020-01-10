@@ -69,7 +69,7 @@ const formatDataSource = (dataSource, region) => {
  * @param {Function} debug
  * @return {Object} - deployed data sources
  */
-const createOrUpdateDataSources = async (appSync, config, debug) => {
+const createOrUpdateDataSources = async (appSync, config, instance) => {
   checkForDuplicates(['name', 'type'], defaultToAnArray(config.dataSources))
   const deployedDataSources = await listAll(
     appSync,
@@ -105,10 +105,10 @@ const createOrUpdateDataSources = async (appSync, config, debug) => {
     map(async (dataSource) => {
       const params = pickExcluded(['mode'], dataSource)
       if (equals(dataSource.mode, 'create')) {
-        debug(`Creating data source ${params.name}`)
+        await instance.debug(`Creating data source ${params.name}`)
         await appSync.createDataSource(params).promise()
       } else if (equals(dataSource.mode, 'update')) {
-        debug(`Updating data source ${params.name}`)
+        await instance.debug(`Updating data source ${params.name}`)
         await appSync.updateDataSource(params).promise()
       }
       return Promise.resolve(dataSource)
@@ -123,21 +123,21 @@ const createOrUpdateDataSources = async (appSync, config, debug) => {
  * @param {Object} state
  * @param {Function} debug
  */
-const removeObsoleteDataSources = async (appSync, config, state, debug) => {
+const removeObsoleteDataSources = async (appSync, config, state, instance) => {
   const obsoleteDataSources = difference(
     defaultToAnArray(state.dataSources),
     map(pick(['name', 'type']), defaultToAnArray(config.dataSources))
   )
   await Promise.all(
     map(async ({ name }) => {
-      debug(`Removing data source ${name}`)
+      await instance.debug(`Removing data source ${name}`)
       try {
         await appSync.deleteDataSource({ apiId: config.apiId, name }).promise()
       } catch (error) {
         if (not(equals(error.code, 'NotFoundException'))) {
           throw error
         }
-        debug(`Data source ${name} already removed`)
+        await instance.debug(`Data source ${name} already removed`)
       }
     }, obsoleteDataSources)
   )

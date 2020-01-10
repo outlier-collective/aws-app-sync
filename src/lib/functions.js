@@ -1,3 +1,4 @@
+const path = require('path')
 const { difference, equals, find, isNil, map, merge, not, pick } = require('ramda')
 
 const { checkForDuplicates, defaultToAnArray, equalsByKeys, listAll, readIfFile } = require('.')
@@ -9,7 +10,7 @@ const { checkForDuplicates, defaultToAnArray, equalsByKeys, listAll, readIfFile 
  * @param {Function} debug
  * @return {Object} - deployed functions
  */
-const createOrUpdateFunctions = async (appSync, config, debug) => {
+const createOrUpdateFunctions = async (appSync, config, instance) => {
   checkForDuplicates(['name', 'dataSource'], defaultToAnArray(config.functions))
   const deployedFunctions = await listAll(
     appSync,
@@ -20,8 +21,10 @@ const createOrUpdateFunctions = async (appSync, config, debug) => {
 
   const functionsWithTemplates = await Promise.all(
     map(async (func) => {
-      const requestMappingTemplate = await readIfFile(func.request)
-      const responseMappingTemplate = await readIfFile(func.response)
+      // const requestMappingTemplate = await readIfFile(func.request)
+      // const responseMappingTemplate = await readIfFile(func.response)
+      const requestMappingTemplate = await readIfFile(path.join(config.src, func.request))
+      const responseMappingTemplate = await readIfFile(path.join(config.src, func.request))
       return merge(func, {
         requestMappingTemplate,
         responseMappingTemplate,
@@ -62,11 +65,11 @@ const createOrUpdateFunctions = async (appSync, config, debug) => {
         description: func.description
       }
       if (equals(func.mode, 'create')) {
-        debug(`Creating function ${func.name}`)
+        await instance.debug(`Creating function ${func.name}`)
         const { functionConfiguration } = await appSync.createFunction(params).promise()
         func.functionId = functionConfiguration.functionId
       } else if (equals(func.mode, 'update')) {
-        debug(`Updating function ${func.name}`)
+        await instance.debug(`Updating function ${func.name}`)
         await appSync.updateFunction(merge(params, { functionId: func.functionId })).promise()
       }
       return Promise.resolve(func)
@@ -81,7 +84,7 @@ const createOrUpdateFunctions = async (appSync, config, debug) => {
  * @param {Object} state
  * @param {Function} debug
  */
-const removeObsoleteFunctions = async (appSync, config, state, debug) => {
+const removeObsoleteFunctions = async (appSync, config, state, instance) => {
   const obsoleteFunctions = difference(
     map(pick(['name', 'dataSource']), defaultToAnArray(state.functions)),
     map(pick(['name', 'dataSource']), defaultToAnArray(config.functions))
@@ -92,7 +95,7 @@ const removeObsoleteFunctions = async (appSync, config, state, debug) => {
         ({ name, dataSource }) => equals(name, func.name) && equals(dataSource, func.dataSource),
         state.functions
       )
-      debug(`Removing function ${func.name}`)
+      await instance.debug(`Removing function ${func.name}`)
       try {
         await appSync
           .deleteFunction({
@@ -104,7 +107,7 @@ const removeObsoleteFunctions = async (appSync, config, state, debug) => {
         if (not(equals(error.code, 'NotFoundException'))) {
           throw error
         }
-        debug(`Function ${func.name} already removed`)
+        await instance.debug(`Function ${func.name} already removed`)
       }
     }, obsoleteFunctions)
   )

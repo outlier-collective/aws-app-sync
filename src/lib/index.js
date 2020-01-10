@@ -156,10 +156,12 @@ const checkForRequired = (requiredKeys = [], source = {}) => {
 const readIfFile = async (data) => {
   let result = data
   if (not(isNil(result)) && (await isFile(result))) {
-    result = await utils.readFile(result)
+    result = fs.readFileSync(result, 'utf8')
   }
   return result
 }
+
+const sleep = async (wait) => new Promise((resolve) => setTimeout(() => resolve(), wait))
 
 module.exports = {
   pickExcluded,
@@ -172,5 +174,6 @@ module.exports = {
   isFile,
   checkForDuplicates,
   checkForRequired,
-  readIfFile
+  readIfFile,
+  sleep
 }
