@@ -18,7 +18,6 @@ const {
 const AWS = require('aws-sdk')
 const crypto = require('crypto')
 const fs = require('fs')
-const { utils } = require('@serverless/core')
 
 const defaultToAnArray = defaultTo([])
 
