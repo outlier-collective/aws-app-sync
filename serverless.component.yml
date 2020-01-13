@@ -1,5 +1,5 @@
 name: aws-app-sync
-version: 0.1.0
+version: 0.1.1
 author: eahefnawy
 org: serverlessinc
 description: Create a GraphQL API with AWS AppSync

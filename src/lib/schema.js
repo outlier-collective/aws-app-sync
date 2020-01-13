@@ -21,7 +21,6 @@ const createSchema = async (appSync, config, state, instance) => {
     schema = 'schema.graphql'
   }
 
-  // schema = await readIfFile(schema)
   schema = await readIfFile(path.join(config.src, schema))
 
   const schemaChecksum = checksum(schema)

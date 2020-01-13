@@ -13,7 +13,13 @@ const {
 } = require('ramda')
 const { getAccountId, defaultToAnArray, sleep } = require('.')
 
-const createRole = async (clients, roleName) => {
+const randomId = Math.random()
+  .toString(36)
+  .substring(6)
+
+const createRole = async (iam, statements) => {
+  const roleName = `appsync-role-${randomId}`
+  const policyName = `appsync-policy-${randomId}`
   const assumeRolePolicyDocument = {
     Version: '2012-10-17',
     Statement: {
@@ -24,7 +30,7 @@ const createRole = async (clients, roleName) => {
       Action: 'sts:AssumeRole'
     }
   }
-  const res = await clients.iam
+  const res = await iam
     .createRole({
       RoleName: roleName,
       Path: '/',
@@ -32,16 +38,51 @@ const createRole = async (clients, roleName) => {
     })
     .promise()
 
-  await clients.iam
+  const policyDocument = JSON.stringify({ Version: '2012-10-17', Statement: statements })
+
+  const createPolicyParams = {
+    PolicyName: policyName,
+    PolicyDocument: policyDocument
+  }
+
+  const policyRes = await iam.createPolicy(createPolicyParams).promise()
+  const policyArn = policyRes.Policy.Arn
+
+  await iam
     .attachRolePolicy({
       RoleName: roleName,
-      PolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess'
+      PolicyArn: policyArn
     })
     .promise()
 
   await sleep(10000)
 
-  return { name: res.Role.RoleName, arn: res.Role.Arn }
+  return { roleArn: res.Role.Arn, policyArn: policyArn }
+}
+
+const removeRole = async (iam, config) => {
+  try {
+    await iam
+      .detachRolePolicy({
+        RoleName: config.roleArn.split('/')[1], // extract role name from arn
+        PolicyArn: config.policyArn
+      })
+      .promise()
+    await iam
+      .deletePolicy({
+        PolicyArn: config.policyArn
+      })
+      .promise()
+    await iam
+      .deleteRole({
+        RoleName: config.roleArn.split('/')[1]
+      })
+      .promise()
+  } catch (error) {
+    if (error.code !== 'NoSuchEntity') {
+      throw error
+    }
+  }
 }
 
 /**
@@ -51,7 +92,7 @@ const createRole = async (clients, roleName) => {
  * @param {Function} debug
  * @return {Object} - deployed service role
  */
-const createServiceRole = async (awsIamRole, config, instance) => {
+const createServiceRole = async (iam, config, instance) => {
   const accountId = await getAccountId()
   const statements = pipe(
     reduce((acc, dataSource) => {
@@ -189,22 +230,15 @@ const createServiceRole = async (awsIamRole, config, instance) => {
   )(defaultToAnArray(config.dataSources))
   if (not(isEmpty(statements))) {
     await instance.debug('Create/update service role')
-    const role = await awsIamRole.deploy({
-      service: 'appsync.amazonaws.com',
-      policy: {
-        Version: '2012-10-17',
-        Statement: statements,
-        arn: 'arn:aws:iam::aws:policy/AdministratorAccess' // todo remove this
-      },
-      region: config.region
-    })
-    return role
+
+    return createRole(iam, statements)
   }
-  await awsIamRole.remove()
+  // todo remove role and policy
   return {}
 }
 
 module.exports = {
   createServiceRole,
-  createRole
+  createRole,
+  removeRole
 }
