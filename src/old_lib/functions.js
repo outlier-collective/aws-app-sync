@@ -65,11 +65,11 @@ const createOrUpdateFunctions = async (appSync, config, instance) => {
         description: func.description
       }
       if (equals(func.mode, 'create')) {
-        await instance.debug(`Creating function ${func.name}`)
+        console.log(`Creating function ${func.name}`)
         const { functionConfiguration } = await appSync.createFunction(params).promise()
         func.functionId = functionConfiguration.functionId
       } else if (equals(func.mode, 'update')) {
-        await instance.debug(`Updating function ${func.name}`)
+        console.log(`Updating function ${func.name}`)
         await appSync.updateFunction(merge(params, { functionId: func.functionId })).promise()
       }
       return Promise.resolve(func)
@@ -95,7 +95,7 @@ const removeObsoleteFunctions = async (appSync, config, state, instance) => {
         ({ name, dataSource }) => equals(name, func.name) && equals(dataSource, func.dataSource),
         state.functions
       )
-      await instance.debug(`Removing function ${func.name}`)
+      console.log(`Removing function ${func.name}`)
       try {
         await appSync
           .deleteFunction({
@@ -107,7 +107,7 @@ const removeObsoleteFunctions = async (appSync, config, state, instance) => {
         if (not(equals(error.code, 'NotFoundException'))) {
           throw error
         }
-        await instance.debug(`Function ${func.name} already removed`)
+        console.log(`Function ${func.name} already removed`)
       }
     }, obsoleteFunctions)
   )

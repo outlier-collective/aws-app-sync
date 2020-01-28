@@ -90,10 +90,10 @@ const createOrUpdateResolvers = async (appSync, config, instance) => {
         pipelineConfig: resolver.pipelineConfig
       }
       if (equals(resolver.mode, 'create')) {
-        await instance.debug(`Creating resolver ${resolver.field}/${resolver.type}`)
+        console.log(`Creating resolver ${resolver.field}/${resolver.type}`)
         await appSync.createResolver(params).promise()
       } else if (equals(resolver.mode, 'update')) {
-        await instance.debug(`Updating resolver ${resolver.field}/${resolver.type}`)
+        console.log(`Updating resolver ${resolver.field}/${resolver.type}`)
         await appSync.updateResolver(params).promise()
       }
       return Promise.resolve(resolver)
@@ -115,7 +115,7 @@ const removeObsoleteResolvers = async (appSync, config, state, instance) => {
   )
   await Promise.all(
     map(async (resolver) => {
-      await instance.debug(`Removing resolver ${resolver.field}/${resolver.type}`)
+      console.log(`Removing resolver ${resolver.field}/${resolver.type}`)
       try {
         await appSync
           .deleteResolver({
@@ -128,7 +128,7 @@ const removeObsoleteResolvers = async (appSync, config, state, instance) => {
         if (not(equals(error.code, 'NotFoundException'))) {
           throw error
         }
-        await instance.debug(`Resolver ${resolver.field}/${resolver.type} already removed`)
+        console.log(`Resolver ${resolver.field}/${resolver.type} already removed`)
       }
     }, obsoleteResolvers)
   )

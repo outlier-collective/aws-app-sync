@@ -1,7 +1,15 @@
 const AWS = require('aws-sdk')
 const { clone, equals, find, isEmpty, isNil, map, merge, not, pick } = require('ramda')
-
 const { listAll } = require('./lib')
+
+/**
+ * Generate a random ID
+ */
+const generateRandomId = () => {
+  return Math.random()
+  .toString(36)
+  .substring(6)
+}
 
 /**
  * Get AWS clients
@@ -18,6 +26,10 @@ const getClients = (credentials, region = 'us-east-1') => {
   }
 }
 
+/**
+ * Authentication
+ * @param {*} authenticationType 
+ */
 const authentication = (authenticationType) => {
   switch (authenticationType) {
     case 'AMAZON_COGNITO_USER_POOLS':
@@ -27,6 +39,10 @@ const authentication = (authenticationType) => {
   }
 }
 
+/**
+ * Open ID connect defaults
+ * @param {*} config 
+ */
 const openIdConnectDefaults = (config) =>
   merge(
     {
@@ -37,6 +53,10 @@ const openIdConnectDefaults = (config) =>
     config
   )
 
+/**
+ * User pool defaults
+ * @param {*} config 
+ */
 const userPoolDefaults = (config) =>
   merge(
     {
@@ -45,6 +65,10 @@ const userPoolDefaults = (config) =>
     config
   )
 
+/**
+ * Add Defaults
+ * @param {*} inputs 
+ */
 const addDefaults = (inputs) => {
   if (inputs.openIDConnectConfig) {
     inputs.openIDConnectConfig = openIdConnectDefaults(inputs.openIDConnectConfig)
@@ -74,7 +98,7 @@ const addDefaults = (inputs) => {
  * @param {object} config
  * @returns {object} - graphqlApi
  */
-const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
+const createOrUpdateGraphqlApi = async (appSync, config) => {
   const inputFields = [
     'name',
     'authenticationType',
@@ -84,33 +108,36 @@ const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
   ]
   const inputs = pick(inputFields, config)
   let graphqlApi
-  if (config.apiId) {
-    await instance.debug(`Fetching graphql API by API id ${config.apiId}`)
+
+  if (apiId) {
+    console.log(`Fetching graphql API by API id: ${apiId}`)
     try {
-      const response = await appSync.getGraphqlApi({ apiId: config.apiId }).promise()
+      const response = await appSync.getGraphqlApi({ apiId }).promise()
       // eslint-disable-next-line prefer-destructuring
       graphqlApi = response.graphqlApi
     } catch (error) {
-      if (not(equals('NotFoundException', error.code))) {
+      if (error.code !==not(equals('NotFoundException', error.code))) {
         throw error
       }
-      await instance.debug(`API id '${config.apiId}' not found`)
+      console.log(`Could not find a graphql API with the ID: ${config.apiId}`)
     }
   }
 
   if (isNil(graphqlApi)) {
-    await instance.debug(`Fetching graphql API by API name ${config.name}`)
+    console.log(`Fetching graphql API by API name: ${config.name}`)
     graphqlApi = find(
       ({ name }) => equals(name, config.name),
       await listAll(appSync, 'listGraphqlApis', {}, 'graphqlApis')
     )
     if (not(isNil(graphqlApi))) {
       config.apiId = graphqlApi.apiId
+    } else {
+      console.log(`Could not find a graphql API with the name: ${config.name}`)
     }
   }
 
   if (isNil(graphqlApi)) {
-    await instance.debug('Creating a new graphql API')
+    console.log('Creating a new graphql API')
     const response = await appSync.createGraphqlApi(inputs).promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi
@@ -118,7 +145,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
     not(equals(addDefaults(clone(inputs)), pick(inputFields, graphqlApi))) &&
     not(isEmpty(inputs))
   ) {
-    await instance.debug(`Updating graphql API ${config.apiId}`)
+    console.log(`Updating graphql API with ID: ${config.apiId}`)
     const parameters = merge(pick(inputFields, graphqlApi), merge(inputs, { apiId: config.apiId }))
     const response = await appSync.updateGraphqlApi(parameters).promise()
     // eslint-disable-next-line prefer-destructuring
@@ -128,6 +155,11 @@ const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
   return graphqlApi
 }
 
+/**
+ * Remove a GraphQL API
+ * @param {*} appSync 
+ * @param {*} config 
+ */
 const removeGraphqlApi = async (appSync, config) => {
   if (not(isNil(config.apiId))) {
     try {
@@ -141,6 +173,7 @@ const removeGraphqlApi = async (appSync, config) => {
 }
 
 module.exports = {
+  generateRandomId,
   getClients,
   createOrUpdateGraphqlApi,
   removeGraphqlApi,

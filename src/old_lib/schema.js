@@ -10,22 +10,22 @@ const { checksum, readIfFile, sleep } = require('.')
  * @param {Function} debug
  * @return {Object} - schema checksum
  */
-const createSchema = async (appSync, config, state, instance) => {
+const createSchema = async (appSync, config, state) => {
   let { schema } = config
   if (isNil(schema)) {
     if (not(config.isApiCreator)) {
-      await instance.debug('Schema not defined, ignoring create/update')
+      console.log('Schema not defined, ignoring create/update')
       return Promise.resolve()
     }
-    await instance.debug('Schema not defined, using schema.graphql')
+    console.log('Schema not defined, using schema.graphql')
     schema = 'schema.graphql'
   }
-
+  console.log(path.join(config.src, schema))
   schema = await readIfFile(path.join(config.src, schema))
 
   const schemaChecksum = checksum(schema)
   if (not(equals(schemaChecksum, state.schemaChecksum))) {
-    await instance.debug(`Create a schema for ${config.apiId}`)
+    console.log(`Create a schema for ${config.apiId}`)
     await appSync
       .startSchemaCreation({
         apiId: config.apiId,
@@ -35,7 +35,7 @@ const createSchema = async (appSync, config, state, instance) => {
     let waiting = true
     do {
       const { status } = await appSync.getSchemaCreationStatus({ apiId: config.apiId }).promise()
-      await instance.debug(`Schema creation status ${status} for ${config.apiId}`)
+      console.log(`Schema creation status ${status} for ${config.apiId}`)
       if (includes(status, ['FAILED', 'SUCCESS', 'NOT_APPLICABLE'])) {
         waiting = false
       } else {
