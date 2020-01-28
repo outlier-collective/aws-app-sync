@@ -85,7 +85,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
   const inputs = pick(inputFields, config)
   let graphqlApi
   if (config.apiId) {
-    await instance.debug(`Fetching graphql API by API id ${config.apiId}`)
+    console.log(`Fetching graphql API by API id ${config.apiId}`)
     try {
       const response = await appSync.getGraphqlApi({ apiId: config.apiId }).promise()
       // eslint-disable-next-line prefer-destructuring
@@ -94,12 +94,12 @@ const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
       if (not(equals('NotFoundException', error.code))) {
         throw error
       }
-      await instance.debug(`API id '${config.apiId}' not found`)
+      console.log(`API id '${config.apiId}' not found`)
     }
   }
 
   if (isNil(graphqlApi)) {
-    await instance.debug(`Fetching graphql API by API name ${config.name}`)
+    console.log(`Fetching graphql API by API name ${config.name}`)
     graphqlApi = find(
       ({ name }) => equals(name, config.name),
       await listAll(appSync, 'listGraphqlApis', {}, 'graphqlApis')
@@ -110,7 +110,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
   }
 
   if (isNil(graphqlApi)) {
-    await instance.debug('Creating a new graphql API')
+    console.log('Creating a new graphql API')
     const response = await appSync.createGraphqlApi(inputs).promise()
     // eslint-disable-next-line prefer-destructuring
     graphqlApi = response.graphqlApi
@@ -118,7 +118,7 @@ const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
     not(equals(addDefaults(clone(inputs)), pick(inputFields, graphqlApi))) &&
     not(isEmpty(inputs))
   ) {
-    await instance.debug(`Updating graphql API ${config.apiId}`)
+    console.log(`Updating graphql API ${config.apiId}`)
     const parameters = merge(pick(inputFields, graphqlApi), merge(inputs, { apiId: config.apiId }))
     const response = await appSync.updateGraphqlApi(parameters).promise()
     // eslint-disable-next-line prefer-destructuring

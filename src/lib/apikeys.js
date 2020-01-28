@@ -74,7 +74,7 @@ const createOrUpdateApiKeys = async (appSync, config, state, instance) => {
         ? Math.round(new Date(dateToParse).getTime() / 1000)
         : undefined
       if (equals(currentApiKey.mode, 'create')) {
-        await instance.debug(
+        console.log(
           `Creating api key ${currentApiKey.name}${
             not(isNil(dateToParse)) ? ` (expires ${expires})` : ''
           }`
@@ -88,7 +88,7 @@ const createOrUpdateApiKeys = async (appSync, config, state, instance) => {
           .promise()
         currentApiKey = merge(currentApiKey, { id: response.apiKey.id })
       } else if (equals(currentApiKey.mode, 'update')) {
-        await instance.debug(
+        console.log(
           `Updating api key ${currentApiKey.name}${
             not(isNil(dateToParse)) ? ` (expires ${expires})` : ''
           }`
@@ -123,7 +123,7 @@ const removeObsoleteApiKeys = async (appSync, config, state, instance) => {
 
   await Promise.all(
     map(async ({ name }) => {
-      await instance.debug(`Removing api key ${name}`)
+      console.log(`Removing api key ${name}`)
       const { id } = find(propEq('name', name), state.apiKeys)
       try {
         await appSync.deleteApiKey({ apiId: config.apiId, id }).promise()
@@ -131,7 +131,7 @@ const removeObsoleteApiKeys = async (appSync, config, state, instance) => {
         if (not(equals(error.code, 'NotFoundException'))) {
           throw error
         }
-        await instance.debug(`Api key ${name} already removed`)
+        console.log(`Api key ${name} already removed`)
       }
     }, obsoleteApiKeys)
   )

@@ -229,7 +229,7 @@ const createServiceRole = async (iam, config, instance) => {
     flatten
   )(defaultToAnArray(config.dataSources))
   if (not(isEmpty(statements))) {
-    await instance.debug('Create/update service role')
+    console.log('Create/update service role')
 
     return createRole(iam, statements)
   }

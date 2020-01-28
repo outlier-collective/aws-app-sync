@@ -41,7 +41,6 @@ class AwsAppSync extends Component {
       config.policyArn = res.policyArn
       this.state.roleArn = config.roleArn
       this.state.policyArn = config.policyArn
-      await this.save()
     }
 
     config.dataSources = map((datasource) => {
@@ -68,7 +67,6 @@ class AwsAppSync extends Component {
     this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
     this.state.mappingTemplates = map(pick(['type', 'field']), config.mappingTemplates)
     this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
-    await this.save()
 
     let output = pick(['apiId', 'arn', 'uris'], config)
 
@@ -77,23 +75,6 @@ class AwsAppSync extends Component {
     delete output.uris
 
     // TODO: Add domain support back in
-    // if (inputs.domain) {
-    //   this.context.debug(`Setting domain ${inputs.domain} for AppSync API ${output.apiId}.`)
-    //   const domain = await this.load('@serverless/domain', 'apiDomain')
-    //   const subdomain = inputs.domain.split('.')[0]
-    //   const secondLevelDomain = inputs.domain.replace(`${subdomain}.`, '')
-
-    //   const domainInputs = {
-    //     domain: secondLevelDomain,
-    //     subdomains: {},
-    //     region: config.region
-    //   }
-
-    //   domainInputs.subdomains[subdomain] = output
-    //   const domainOutputs = await domain(domainInputs)
-
-    //   output.domain = `${domainOutputs.domains[0]}/graphql`
-    // }
 
     if (not(isNil(config.apiKeys)) && not(isEmpty(config.apiKeys))) {
       output = merge(output, {
@@ -109,34 +90,31 @@ class AwsAppSync extends Component {
     const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
     const { appSync, iam } = getClients(this.credentials.aws, config.region)
     if (not(this.state.isApiCreator)) {
-      await this.debug('Remove created resources from existing API without deleting the API.')
+      console.log('Remove created resources from existing API without deleting the API.')
       await removeObsoleteResolvers(
         appSync,
         { apiId: this.state.apiId, mappingTemplates: [] },
-        this.state,
-        this.debug
+        this.state
       )
       await removeObsoleteFunctions(
         appSync,
         { apiId: this.state.apiId, functions: [] },
-        this.state,
-        this.debug
+        this.state
       )
       await removeObsoleteDataSources(
         appSync,
         { apiId: this.state.apiId, dataSources: [] },
-        this.state,
-        this.debug
+        this.state
       )
-      await removeObsoleteApiKeys(appSync, { apiId: this.state.apiId, apiKeys: [] }, this.debug)
+      await removeObsoleteApiKeys(appSync, { apiId: this.state.apiId, apiKeys: [] })
     } else {
-      await this.debug(`Removing AppSync API with ID ${this.state.apiId}.`)
+      console.log(`Removing AppSync API with ID ${this.state.apiId}.`)
       await removeGraphqlApi(appSync, { apiId: this.state.apiId })
     }
 
     if (this.state.roleArn) {
-      await this.debug(`Removing policy with arn ${this.state.policyArn}.`)
-      await this.debug(`Removing role with arn ${this.state.roleArn}.`)
+      console.log(`Removing policy with arn ${this.state.policyArn}.`)
+      console.log(`Removing role with arn ${this.state.roleArn}.`)
 
       await removeRole(iam, this.state)
     }
@@ -146,7 +124,6 @@ class AwsAppSync extends Component {
     // await domain.remove()
 
     this.state = {}
-    await this.save()
   }
 }
 

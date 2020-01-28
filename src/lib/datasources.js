@@ -105,10 +105,10 @@ const createOrUpdateDataSources = async (appSync, config, instance) => {
     map(async (dataSource) => {
       const params = pickExcluded(['mode'], dataSource)
       if (equals(dataSource.mode, 'create')) {
-        await instance.debug(`Creating data source ${params.name}`)
+        console.log(`Creating data source ${params.name}`)
         await appSync.createDataSource(params).promise()
       } else if (equals(dataSource.mode, 'update')) {
-        await instance.debug(`Updating data source ${params.name}`)
+        console.log(`Updating data source ${params.name}`)
         await appSync.updateDataSource(params).promise()
       }
       return Promise.resolve(dataSource)
@@ -130,14 +130,14 @@ const removeObsoleteDataSources = async (appSync, config, state, instance) => {
   )
   await Promise.all(
     map(async ({ name }) => {
-      await instance.debug(`Removing data source ${name}`)
+      console.log(`Removing data source ${name}`)
       try {
         await appSync.deleteDataSource({ apiId: config.apiId, name }).promise()
       } catch (error) {
         if (not(equals(error.code, 'NotFoundException'))) {
           throw error
         }
-        await instance.debug(`Data source ${name} already removed`)
+        console.log(`Data source ${name} already removed`)
       }
     }, obsoleteDataSources)
   )
