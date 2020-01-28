@@ -26,6 +26,12 @@ class AwsAppSync extends Component {
   async deploy(inputs = {}) {
     const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
     config.src = inputs.src
+
+    if (config.src) {
+      console.log('Unzipping source files')
+      config.src = await this.unzip(config.src, true) // Returns directory with unzipped files
+    }
+
     const { appSync, iam } = getClients(this.credentials.aws, config.region)
     const graphqlApi = await createOrUpdateGraphqlApi(appSync, config, this)
     config.apiId = graphqlApi.apiId || config.apiId
