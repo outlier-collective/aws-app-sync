@@ -1,137 +1,92 @@
 const path = require('path')
-const { checkForDuplicates, defaultToAnArray, equalsByKeys, listAll, readIfFile } = require('.')
-const { difference, equals, find, isNil, map, not, flatten, merge, pick, pipe } = require('ramda')
+const fs = require('fs')
+const { checksum, readIfFile, sleep } = require('../utils')
 
 /**
  * Create or update resolvers
- * @param {Object} appSync
- * @param {Object} config
- * @param {Function} debug
- * @return {Object} - deployed resolvers
  */
-const createOrUpdateResolvers = async (appSync, config, instance) => {
-  checkForDuplicates(['dataSource', 'type', 'field'], defaultToAnArray(config.mappingTemplates))
-  const deployedResolvers = pipe(
-    flatten,
-    map((resolver) =>
-      merge(resolver, {
-        type: resolver.typeName,
-        field: resolver.fieldName,
-        dataSource: resolver.dataSourceName
-      })
-    )
-  )(
-    await Promise.all(
-      map(
-        async (mappingTemplate) =>
-          listAll(
-            appSync,
-            'listResolvers',
-            { apiId: config.apiId, typeName: mappingTemplate.type },
-            'resolvers'
-          ),
-        defaultToAnArray(config.mappingTemplates)
-      )
-    )
-  )
+const createOrUpdateResolvers = async (appSync, inputs, state) => {
 
-  const resolversWithTemplates = await Promise.all(
-    map(async (resolver) => {
-      // let requestMappingTemplate = await readIfFile(resolver.request)
-      // let responseMappingTemplate = await readIfFile(resolver.response)
-      // let requestMappingTemplate = await readIfFile(path.join(config.src, resolver.request))
-      // let responseMappingTemplate = await readIfFile(path.join(config.src, resolver.response))
-      let requestMappingTemplate = null
-      let responseMappingTemplate = null
-
-      if (isNil(requestMappingTemplate) || isNil(responseMappingTemplate)) {
-        const { dataSource } = await appSync
-          .getDataSource({ apiId: config.apiId, name: resolver.dataSource })
-          .promise()
-        if (equals(dataSource.type, 'AWS_LAMBDA')) {
-          requestMappingTemplate =
-            requestMappingTemplate ||
-            '{ "version": "2017-02-28", "operation": "Invoke", "payload": $util.toJson($context.arguments) })'
-          responseMappingTemplate = responseMappingTemplate || '$util.toJson($context.result)'
-        }
+  const process = async (mt) => {
+    let resolver
+    try {
+      resolver = await appSync.getResolver({
+        apiId: state.apiId,
+        fieldName: mt.field,
+        typeName: mt.type,
+      }).promise()
+    } catch(error) {
+      if (error.code !== 'NotFoundException') {
+        throw error
       }
+    }
 
-      return merge(resolver, { requestMappingTemplate, responseMappingTemplate })
-    }, defaultToAnArray(config.mappingTemplates))
-  )
+    // Load mapping template
+    try {
+      if (mt.request) mt.request = fs.readFileSync(path.join(inputs.src, mt.request), 'utf8')
+      if (mt.response) mt.response = fs.readFileSync(path.join(inputs.src, mt.response), 'utf8')
+    } catch(error) {
+      throw new Error(`Coulddn't load request/response mapping template files for type: ${mt.type}.  Is the path/format correct?  Here is the error: ${error.message}`)
+    }
 
-  const resolversToDeploy = map((resolver) => {
-    const deployedResolver = find(
-      ({ type, field }) => equals(type, resolver.type) && equals(field, resolver.field),
-      deployedResolvers
-    )
-    const resolverEquals = isNil(deployedResolver)
-      ? false
-      : equalsByKeys(
-          ['dataSource', 'type', 'field', 'responseMappingTemplate', 'requestMappingTemplate'],
-          deployedResolver,
-          resolver
-        )
+    // Format
+    let params = {
+      apiId: state.apiId,
+      fieldName: mt.field,
+      typeName: mt.type,
+      dataSourceName: mt.dataSource,
+      requestMappingTemplate: mt.request,
+      responseMappingTemplate: mt.request
+    }
+    if (mt.caching) params.cachingConfig = mt.caching
 
-    const mode = not(resolverEquals) ? (not(deployedResolver) ? 'create' : 'update') : 'ignore'
-    return merge(resolver, { mode })
-  }, resolversWithTemplates)
+    if (!resolver) {
+      console.log(`Creating resolver: ${mt.field} - ${mt.type}`)
+      resolver = await appSync.createResolver(params).promise()
+    } else {
+      console.log(`Updating resolver: ${mt.field} - ${mt.type}`)
+      resolver = await appSync.updateResolver(params).promise()
+    }
+  }
 
-  return await Promise.all(
-    map(async (resolver) => {
-      const params = {
-        apiId: config.apiId,
-        fieldName: resolver.field,
-        requestMappingTemplate: resolver.requestMappingTemplate,
-        responseMappingTemplate: resolver.responseMappingTemplate,
-        typeName: resolver.type,
-        dataSourceName: resolver.dataSource,
-        kind: resolver.kind,
-        pipelineConfig: resolver.pipelineConfig
-      }
-      if (equals(resolver.mode, 'create')) {
-        console.log(`Creating resolver ${resolver.field}/${resolver.type}`)
-        await appSync.createResolver(params).promise()
-      } else if (equals(resolver.mode, 'update')) {
-        console.log(`Updating resolver ${resolver.field}/${resolver.type}`)
-        await appSync.updateResolver(params).promise()
-      }
-      return Promise.resolve(resolver)
-    }, resolversToDeploy)
-  )
+  const operations = []
+
+  inputs.mappingTemplates.forEach((mt) => {
+    operations.push(process(mt))
+  })
+
+  return Promise.all(operations)
+  .then()
+
 }
 
 /**
- * Remove obsolete resolvers
- * @param {Object} appSync
- * @param {Object} config
- * @param {Object} state
- * @param {Function} debug
+ * List Resolvers
+ * @param {*} iam 
+ * @param {*} policyName 
  */
-const removeObsoleteResolvers = async (appSync, config, state, instance) => {
-  const obsoleteResolvers = difference(
-    defaultToAnArray(state.mappingTemplates),
-    map(pick(['type', 'field']), defaultToAnArray(config.mappingTemplates))
-  )
-  await Promise.all(
-    map(async (resolver) => {
-      console.log(`Removing resolver ${resolver.field}/${resolver.type}`)
-      try {
-        await appSync
-          .deleteResolver({
-            apiId: config.apiId,
-            fieldName: resolver.field,
-            typeName: resolver.type
-          })
-          .promise()
-      } catch (error) {
-        if (not(equals(error.code, 'NotFoundException'))) {
-          throw error
-        }
-        console.log(`Resolver ${resolver.field}/${resolver.type} already removed`)
-      }
-    }, obsoleteResolvers)
-  )
+const listResolvers = async(appSync, apiId, typeName) => {
+  let resolvers = []
+  let nextToken
+  do {
+    const list = await appSync
+    .listResolvers({
+      apiId,
+      maxResults: 100,
+      typeName,
+      nextToken,
+    })
+    .promise()
+    resolvers = resolvers.concat(list.resolvers)
+    nextToken = list.nextToken ? list.nextToken : null
+  }
+  while (nextToken)
+  
+  return resolvers
 }
 
-module.exports = { createOrUpdateResolvers, removeObsoleteResolvers }
+/**
+ * Exports
+ */
+
+module.exports = { createOrUpdateResolvers }

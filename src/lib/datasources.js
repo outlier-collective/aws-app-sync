@@ -1,149 +1,100 @@
-const { clone, difference, equals, find, isNil, map, merge, not, pick } = require('ramda')
-
-const {
-  equalsByKeysExcluded,
-  listAll,
-  pickExcluded,
-  defaultToAnArray,
-  checkForDuplicates
-} = require('.')
-
-/**
- * Format data source
- * @param {Object} dataSource
- * @param {String} region
- * @returns {Object} - Formatted data source
- */
-const formatDataSource = (dataSource, region) => {
-  let result = {
-    name: dataSource.name,
-    type: dataSource.type
-  }
-  const config = clone(dataSource.config)
-  delete config.region // delete because awsRegion is used in the datasource configs...
-  result.description = dataSource.description || null
-  switch (dataSource.type) {
-    case 'AWS_LAMBDA':
-      result = merge(result, {
-        lambdaConfig: config
-      })
-      break
-    case 'AMAZON_DYNAMODB':
-      result = merge(result, {
-        dynamodbConfig: config
-      })
-      result.dynamodbConfig.awsRegion = region
-      result.dynamodbConfig.useCallerCredentials = !!config.useCallerCredentials
-      break
-    case 'AMAZON_ELASTICSEARCH':
-      result = merge(result, {
-        elasticsearchConfig: config
-      })
-      result.elasticsearchConfig.awsRegion = region
-      break
-    case 'HTTP':
-      result = merge(result, {
-        httpConfig: config
-      })
-      break
-    case 'RELATIONAL_DATABASE':
-      result = merge(result, {
-        relationalDatabaseConfig: {
-          rdsHttpEndpointConfig: config,
-          relationalDatabaseSourceType: 'RDS_HTTP_ENDPOINT'
-        }
-      })
-      result.relationalDatabaseConfig.rdsHttpEndpointConfig.awsRegion = region
-      break
-    default:
-      break
-  }
-
-  return result
-}
-
 /**
  * Create or update data sources
  * @param {Object} appSync
  * @param {Object} config
- * @param {Function} debug
  * @return {Object} - deployed data sources
  */
-const createOrUpdateDataSources = async (appSync, config, instance) => {
-  checkForDuplicates(['name', 'type'], defaultToAnArray(config.dataSources))
-  const deployedDataSources = await listAll(
-    appSync,
-    'listDataSources',
-    { apiId: config.apiId },
-    'dataSources'
-  )
+const createUpdateOrDeleteDataSources = async (appSync, inputs, state) => {
 
-  const dataSourcesToDeploy = map((dataSource) => {
-    const formattedDataSource = merge(
-      formatDataSource(dataSource, dataSource.config.region || config.region),
-      {
-        apiId: config.apiId,
-        serviceRoleArn: dataSource.serviceRoleArn
-      }
-    )
-    const deployedDataSource = find(
-      ({ name }) => equals(name, dataSource.name),
-      deployedDataSources
-    )
-    const dataSourcesEquals = isNil(deployedDataSource)
-      ? false
-      : equalsByKeysExcluded(
-          ['dataSourceArn', 'apiId', 'description'],
-          deployedDataSource,
-          formattedDataSource
-        )
-    const mode = not(dataSourcesEquals) ? (not(deployedDataSource) ? 'create' : 'update') : 'ignore'
-    return merge(formattedDataSource, { mode })
-  }, defaultToAnArray(config.dataSources))
+  let dataSourcesToCreate = []
+  let dataSourcesToUpdate = []
+  let dataSourcesToRemove = []
 
-  return await Promise.all(
-    map(async (dataSource) => {
-      const params = pickExcluded(['mode'], dataSource)
-      if (equals(dataSource.mode, 'create')) {
-        console.log(`Creating data source ${params.name}`)
-        await appSync.createDataSource(params).promise()
-      } else if (equals(dataSource.mode, 'update')) {
-        console.log(`Updating data source ${params.name}`)
-        await appSync.updateDataSource(params).promise()
+  // List all datasources
+  let result = []
+  let nextToken
+  do {
+    const params = {}
+    if (nextToken) { params.nextToken = nextToken }
+    const response = await appSync.listDataSources({ apiId: state.apiId }).promise()
+    result = result.concat(response.dataSources)
+    nextToken = response.nextToken
+  } while (nextToken)
+  const deployedDataSources = result
+
+  // Add everything to be removed at first, then filter this list away.  We just need the name, to send to the AppSync API
+  dataSourcesToRemove = deployedDataSources.map(ds => { return { apiId: state.apiId, name: ds.name, type: ds.type }})
+
+  // Prepare full list of data sources to deploy
+  inputs.dataSources.forEach((inputDS) => {
+
+    // Currently, only AWS_LAMBDA is supported as a data type
+    if (inputDS.type !== 'AWS_LAMBDA') return
+
+    // Remove from "remove" array
+    dataSourcesToRemove.splice(dataSourcesToRemove.findIndex(ds => ds.name === inputDS.name),1)
+    
+    // Prepare format App Sync APIs expect (our config is different, for reasons of simplicity)
+    const formattedDS = {
+      apiId: state.apiId,
+      name: inputDS.name,
+      type: inputDS.type,
+      description: inputDS.description,
+      serviceRoleArn: inputs.roleArn || state.autoRoleArn, // Add the service role from inputs/state here
+    }
+
+    // Format type: AWS_LAMBDA
+    if (formattedDS.type === 'AWS_LAMBDA') {
+      formattedDS.lambdaConfig = {}
+      formattedDS.lambdaConfig.lambdaFunctionArn = inputDS.config.lambdaFunctionArn
+    }
+
+    // TODO: Add more data sources.  Don't forget to auto-create their policy in the IAM Role area (role.js) so this API can instantly use them!
+
+    // Check existing data sources for which need to be updated or removed
+    deployedDataSources.forEach((deployedDS) => {
+      // If datasource is still in inputs, update it
+      if (formattedDS.type === deployedDS.type && formattedDS.name === deployedDS.name) {
+        dataSourcesToUpdate.push(formattedDS)
       }
-      return Promise.resolve(dataSource)
-    }, dataSourcesToDeploy)
-  )
+    })
+
+    // Check for new datasources that need to be created
+    let exists = dataSourcesToUpdate.find(d => d.name === inputDS.name)
+    if (!exists) {
+      dataSourcesToCreate.push(formattedDS)
+    }
+  })
+
+  // Process Creates, Updates, Deletes
+  const create = async(ds) => {
+    console.log(`Creating datasource: ${ds.type} - ${ds.name}`)
+    return await appSync.createDataSource(ds).promise()
+  }
+  const update = async(ds) => {
+    console.log(`Updating datasource: ${ds.type} - ${ds.name}`)
+    return await appSync.updateDataSource(ds).promise()
+  }
+  const remove = async(ds) => {
+    console.log(`Deleting datasource: ${ds.type} - ${ds.name}`)
+    delete ds.type // this breaks the API call
+    return await appSync.deleteDataSource(ds).promise()
+  }
+  let actions = []
+  actions = actions.concat(dataSourcesToCreate.map(create))
+  actions = actions.concat(dataSourcesToUpdate.map(update))
+  actions = actions.concat(dataSourcesToRemove.map(remove))
+
+  return Promise.all(actions)
+  .catch((err) => {
+    err.message =`Could not perform operation on a datasource due to error: ${err.message}`
+    throw err
+  })
 }
 
 /**
- * Remove obsolete data sources
- * @param {Object} appSync
- * @param {Object} config
- * @param {Object} state
- * @param {Function} debug
+ * Exports
  */
-const removeObsoleteDataSources = async (appSync, config, state, instance) => {
-  const obsoleteDataSources = difference(
-    defaultToAnArray(state.dataSources),
-    map(pick(['name', 'type']), defaultToAnArray(config.dataSources))
-  )
-  await Promise.all(
-    map(async ({ name }) => {
-      console.log(`Removing data source ${name}`)
-      try {
-        await appSync.deleteDataSource({ apiId: config.apiId, name }).promise()
-      } catch (error) {
-        if (not(equals(error.code, 'NotFoundException'))) {
-          throw error
-        }
-        console.log(`Data source ${name} already removed`)
-      }
-    }, obsoleteDataSources)
-  )
-}
-
 module.exports = {
-  createOrUpdateDataSources,
-  removeObsoleteDataSources
+  createUpdateOrDeleteDataSources
 }

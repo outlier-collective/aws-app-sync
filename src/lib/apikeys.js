@@ -1,143 +1,67 @@
-const { listAll, defaultToAnArray, checkForRequired } = require('.')
-const {
-  clone,
-  difference,
-  equals,
-  find,
-  is,
-  isNil,
-  map,
-  merge,
-  not,
-  pick,
-  propEq,
-  reduce
-} = require('ramda')
+const path = require('path')
+const fs = require('fs')
+const { checksum, readIfFile, sleep } = require('../utils')
 
 /**
- * Format API keys
- * @param {Array} apiKeys
- * @returns {Array} - formatted API keys
+ * Create or update api keys
+ * @param {*} appSync 
+ * @param {*} inputs 
+ * @param {*} state 
  */
-const formatInputApiKeys = (apiKeys) =>
-  map((apiKey) => (is(String, apiKey) ? { name: apiKey } : apiKey), defaultToAnArray(apiKeys))
+const createOrUpdateApiKeys = async (appSync, inputs, state) => {
 
-/**
- * Creates or updates api keys
- * @param {Object} appSync
- * @param {Object} config
- * @param {Object} state
- * @param {Function} debug
- * @returns {Array} - deployed API keys
- */
-const createOrUpdateApiKeys = async (appSync, config, state, instance) => {
-  const deployedApiKeys = await listAll(appSync, 'listApiKeys', { apiId: config.apiId }, 'apiKeys')
+  const process = async (ak) => {
+    let apiKey = await listAndFindApiKey(appSync, state.apiId, ak)
 
-  const stateApiKeys = reduce(
-    (acc, stateApiKey) => {
-      const deployedApiKey = find(propEq('id', stateApiKey.id), deployedApiKeys)
-      if (not(isNil(deployedApiKey))) {
-        acc.push(merge(stateApiKey, deployedApiKey))
-      }
-      return acc
-    },
-    [],
-    defaultToAnArray(state.apiKeys)
-  )
-
-  const apiKeysToDeploy = map((apiKey) => {
-    checkForRequired(['name'], apiKey)
-    const stateApiKey = find(propEq('name', apiKey.name), stateApiKeys)
-    let apiKeyToDeploy
-    if (isNil(stateApiKey)) {
-      apiKeyToDeploy = merge(apiKey, { mode: 'create' })
-    } else if (
-      (not(isNil(apiKey.description)) &&
-        not(equals(apiKey.description, stateApiKey.description))) ||
-      (not(isNil(apiKey.expires)) && not(equals(apiKey.expires, stateApiKey.expires)))
-    ) {
-      apiKeyToDeploy = merge(merge(stateApiKey, { mode: 'update' }), apiKey)
-    } else {
-      apiKeyToDeploy = merge(merge(stateApiKey, { mode: 'ignore' }), apiKey)
+    // Create API Key
+    if (!apiKey) {
+      console.log(`Creating api key: ${ak}`)
+      // Format
+      apiKey = await appSync.createApiKey({ apiId: state.apiId }).promise()
     }
-    return apiKeyToDeploy
-  }, formatInputApiKeys(config.apiKeys))
+  }
 
-  return Promise.all(
-    map(async (apiKey) => {
-      let currentApiKey = clone(apiKey)
-      const dateToParse =
-        is(Number, currentApiKey.expires) && currentApiKey.expires < 1000000000000
-          ? currentApiKey.expires * 1000
-          : currentApiKey.expires
-      const expires = not(isNil(dateToParse))
-        ? Math.round(new Date(dateToParse).getTime() / 1000)
-        : undefined
-      if (equals(currentApiKey.mode, 'create')) {
-        console.log(
-          `Creating api key ${currentApiKey.name}${
-            not(isNil(dateToParse)) ? ` (expires ${expires})` : ''
-          }`
-        )
-        const response = await appSync
-          .createApiKey({
-            apiId: config.apiId,
-            description: currentApiKey.description,
-            expires
-          })
-          .promise()
-        currentApiKey = merge(currentApiKey, { id: response.apiKey.id })
-      } else if (equals(currentApiKey.mode, 'update')) {
-        console.log(
-          `Updating api key ${currentApiKey.name}${
-            not(isNil(dateToParse)) ? ` (expires ${expires})` : ''
-          }`
-        )
-        await appSync
-          .updateApiKey({
-            apiId: config.apiId,
-            id: currentApiKey.id,
-            description: currentApiKey.description,
-            expires
-          })
-          .promise()
-      }
+  const operations = []
 
-      return pick(['name', 'id'], currentApiKey)
-    }, defaultToAnArray(apiKeysToDeploy))
-  )
+  inputs.apiKeys.forEach((ak) => {
+    operations.push(process(ak))
+  })
+
+  return Promise.all(operations)
+  .then()
 }
 
 /**
- * Remove obsolete API keys
- * @param {Object} appSync
- * @param {Object} config
- * @param {Object} state
- * @param {Function} debug
+ * List and find api key
+ * @param {*} appSync 
+ * @param {*} apiId 
+ * @param {*} apiKeyId 
  */
-const removeObsoleteApiKeys = async (appSync, config, state, instance) => {
-  const obsoleteApiKeys = difference(
-    map(pick(['name']), defaultToAnArray(state.apiKeys)),
-    map(pick(['name']), formatInputApiKeys(config.apiKeys))
-  )
+const listAndFindApiKey = async(appSync, apiId, apiKeyId) => {
+  let apiKey
+  let apiKeys = []
+  let nextToken
+  do {
+    const list = await appSync
+    .listApiKeys({
+      apiId,
+      maxResults: 25,
+      nextToken,
+    })
+    .promise()
+    apiKeys = apiKeys.concat(list.apiKeys)
+    nextToken = list.nextToken ? list.nextToken : null
+  }
+  while (nextToken)
 
-  await Promise.all(
-    map(async ({ name }) => {
-      console.log(`Removing api key ${name}`)
-      const { id } = find(propEq('name', name), state.apiKeys)
-      try {
-        await appSync.deleteApiKey({ apiId: config.apiId, id }).promise()
-      } catch (error) {
-        if (not(equals(error.code, 'NotFoundException'))) {
-          throw error
-        }
-        console.log(`Api key ${name} already removed`)
-      }
-    }, obsoleteApiKeys)
-  )
+  // Find one with the same name
+  apiKeys.forEach((ak) => {
+    if (ak.id === apiKeyId) apiKey = ak
+  })
+
+  return apiKey ? apiKey : null
 }
 
 module.exports = {
-  createOrUpdateApiKeys,
-  removeObsoleteApiKeys
+  createOrUpdateApiKeys
 }

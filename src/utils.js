@@ -1,7 +1,20 @@
 const AWS = require('aws-sdk')
-const { clone, equals, find, isEmpty, isNil, map, merge, not, pick } = require('ramda')
+const fs = require('fs')
+const crypto = require('crypto')
 
-const { listAll } = require('./lib')
+/**
+ * Sleep
+ */
+const sleep = async (wait) => new Promise((resolve) => setTimeout(() => resolve(), wait))
+
+/**
+ * Generate a random ID
+ */
+const generateRandomId = () => {
+  return Math.random()
+  .toString(36)
+  .substring(6)
+}
 
 /**
  * Get AWS clients
@@ -18,136 +31,63 @@ const getClients = (credentials, region = 'us-east-1') => {
   }
 }
 
-const authentication = (authenticationType) => {
-  switch (authenticationType) {
-    case 'AMAZON_COGNITO_USER_POOLS':
-      return 'userPoolConfig'
-    case 'OPENID_CONNECT':
-      return 'openIDConnectConfig'
-  }
-}
-
-const openIdConnectDefaults = (config) =>
-  merge(
-    {
-      clientId: null,
-      iatTTL: 0,
-      authTTL: 0
-    },
-    config
-  )
-
-const userPoolDefaults = (config) =>
-  merge(
-    {
-      appIdClientRegex: null
-    },
-    config
-  )
-
-const addDefaults = (inputs) => {
-  if (inputs.openIDConnectConfig) {
-    inputs.openIDConnectConfig = openIdConnectDefaults(inputs.openIDConnectConfig)
-  } else if (inputs.userPoolConfig) {
-    inputs.userPoolConfig = userPoolDefaults(inputs.userPoolConfig)
-  }
-  if (inputs.additionalAuthenticationProviders) {
-    inputs.additionalAuthenticationProviders = map((additionalAuthenticationProvider) => {
-      if (additionalAuthenticationProvider.openIDConnectConfig) {
-        additionalAuthenticationProvider.openIDConnectConfig = openIdConnectDefaults(
-          additionalAuthenticationProvider.openIDConnectConfig
-        )
-      } else if (additionalAuthenticationProvider.userPoolConfig) {
-        additionalAuthenticationProvider.userPoolConfig = userPoolDefaults(
-          additionalAuthenticationProvider.userPoolConfig
-        )
-      }
-      return additionalAuthenticationProvider
-    }, inputs.additionalAuthenticationProviders)
-  }
-  return inputs
+/**
+ * Returns current AWS account id
+ * @returns {String} - account id
+ */
+const getAccountId = async () => {
+  const STS = new AWS.STS()
+  const res = await STS.getCallerIdentity({}).promise()
+  return res.Account
 }
 
 /**
- * Create or update graphql api
- * @param {object} appSync
- * @param {object} config
- * @returns {object} - graphqlApi
+ * Create a checksum
+ * @param {String} data
+ * @returns {String} - checksum
  */
-const createOrUpdateGraphqlApi = async (appSync, config, instance) => {
-  const inputFields = [
-    'name',
-    'authenticationType',
-    authentication(config.authenticationType),
-    'additionalAuthenticationProviders',
-    'logConfig'
-  ]
-  const inputs = pick(inputFields, config)
-  let graphqlApi
-  if (config.apiId) {
-    console.log(`Fetching graphql API by API id ${config.apiId}`)
-    try {
-      const response = await appSync.getGraphqlApi({ apiId: config.apiId }).promise()
-      // eslint-disable-next-line prefer-destructuring
-      graphqlApi = response.graphqlApi
-    } catch (error) {
-      if (not(equals('NotFoundException', error.code))) {
-        throw error
+const checksum = (data) => {
+  return crypto
+    .createHash('sha256')
+    .update(data)
+    .digest('hex')
+}
+
+/**
+ * Check if the filePath is a file
+ * @param {*} filePath
+ */
+const isFile = async (filePath) =>
+  new Promise((resolve) => {
+    fs.stat(filePath, (error) => {
+      if (error) {
+        resolve(false)
       }
-      console.log(`API id '${config.apiId}' not found`)
-    }
-  }
+      resolve(true)
+    })
+  })
 
-  if (isNil(graphqlApi)) {
-    console.log(`Fetching graphql API by API name ${config.name}`)
-    graphqlApi = find(
-      ({ name }) => equals(name, config.name),
-      await listAll(appSync, 'listGraphqlApis', {}, 'graphqlApis')
-    )
-    if (not(isNil(graphqlApi))) {
-      config.apiId = graphqlApi.apiId
-    }
+/**
+ * Reads if string is a file otherwise return
+ * @param {Object|String} data
+ * @returns {Object}
+ */
+const readIfFile = async (data) => {
+  let result = data
+  if (result && (await isFile(result))) {
+    result = fs.readFileSync(result, 'utf8')
   }
-
-  if (isNil(graphqlApi)) {
-    console.log('Creating a new graphql API')
-    const response = await appSync.createGraphqlApi(inputs).promise()
-    // eslint-disable-next-line prefer-destructuring
-    graphqlApi = response.graphqlApi
-  } else if (
-    not(equals(addDefaults(clone(inputs)), pick(inputFields, graphqlApi))) &&
-    not(isEmpty(inputs))
-  ) {
-    console.log(`Updating graphql API ${config.apiId}`)
-    const parameters = merge(pick(inputFields, graphqlApi), merge(inputs, { apiId: config.apiId }))
-    const response = await appSync.updateGraphqlApi(parameters).promise()
-    // eslint-disable-next-line prefer-destructuring
-    graphqlApi = response.graphqlApi
-  }
-
-  return graphqlApi
+  return result
 }
 
-const removeGraphqlApi = async (appSync, config) => {
-  if (not(isNil(config.apiId))) {
-    try {
-      await appSync.deleteGraphqlApi({ apiId: config.apiId }).promise()
-    } catch (error) {
-      if (not(equals(error.code, 'NotFoundException'))) {
-        throw error
-      }
-    }
-  }
-}
-
-module.exports = {
-  getClients,
-  createOrUpdateGraphqlApi,
-  removeGraphqlApi,
-  ...require('./lib/datasources'),
-  ...require('./lib/schema'),
-  ...require('./lib/resolvers'),
-  ...require('./lib/functions'),
-  ...require('./lib/role'),
-  ...require('./lib/apikeys')
-}
+/**
+ * Exports
+ */
+ module.exports = {
+   generateRandomId,
+   getClients,
+   getAccountId,
+   sleep,
+   checksum,
+   readIfFile
+ }

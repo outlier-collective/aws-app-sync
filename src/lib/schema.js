@@ -1,51 +1,59 @@
 const path = require('path')
-const { equals, includes, isNil, not } = require('ramda')
-const { checksum, readIfFile, sleep } = require('.')
+const { checksum, readIfFile, sleep } = require('../utils')
 
 /**
- * Create schema
- * @param {Object} appSync
- * @param {Object} config
- * @param {Object} state
- * @param {Function} debug
- * @return {Object} - schema checksum
+ * Process Schema
+ * @param {*} appSync 
+ * @param {*} inputs 
+ * @param {*} state 
  */
-const createSchema = async (appSync, config, state, instance) => {
-  let { schema } = config
-  if (isNil(schema)) {
-    if (not(config.isApiCreator)) {
-      console.log('Schema not defined, ignoring create/update')
-      return Promise.resolve()
-    }
-    console.log('Schema not defined, using schema.graphql')
-    schema = 'schema.graphql'
-  }
+const processSchema = async (appSync, inputs, state) => {
 
-  schema = await readIfFile(path.join(config.src, schema))
+  console.log('Processing your schema...')
+
+  let schema
+
+  // Check if schema is an input.  If not, hope it's included as a file
+  if (!inputs.schema) {
+    console.log('Loading your schema from file: schema.graphql...')
+    schema = 'schema.graphql'
+    try {
+      schema = await readIfFile(path.join(inputs.src, schema))
+    } catch(error) {
+      throw new Error(`Could not read "schema.graphql" because: ${error.message}`)
+    }
+    console.log('Successfully loaded: schema.graphql')
+  }
 
   const schemaChecksum = checksum(schema)
-  if (not(equals(schemaChecksum, state.schemaChecksum))) {
-    console.log(`Create a schema for ${config.apiId}`)
-    await appSync
-      .startSchemaCreation({
-        apiId: config.apiId,
-        definition: Buffer.from(schema)
-      })
-      .promise()
-    let waiting = true
-    do {
-      const { status } = await appSync.getSchemaCreationStatus({ apiId: config.apiId }).promise()
-      console.log(`Schema creation status ${status} for ${config.apiId}`)
-      if (includes(status, ['FAILED', 'SUCCESS', 'NOT_APPLICABLE'])) {
-        waiting = false
-      } else {
-        await sleep(1000)
-      }
-    } while (waiting)
+
+  if (schemaChecksum === state.schemaChecksum) {
+    console.log('Did not detect any changes to schema.  Skipping...')
+    return schemaChecksum
   }
+
+  console.log(`Creating/updating schema...`)
+  await appSync
+    .startSchemaCreation({
+      apiId: state.apiId,
+      definition: Buffer.from(schema)
+    })
+    .promise()
+  let waiting = true
+  do {
+    const status = await appSync.getSchemaCreationStatus({ apiId: state.apiId }).promise()
+    console.log(`Schema creation status ${status.status} for ${state.apiId}`)
+    if (['FAILED', 'SUCCESS', 'NOT_APPLICABLE'].includes(status.status)) {
+      console.log(`Schema status details: ${status.details}`)
+      waiting = false
+    } else {
+      await sleep(1000)
+    }
+  } while (waiting)
+
   return schemaChecksum
 }
 
 module.exports = {
-  createSchema
+  processSchema,
 }

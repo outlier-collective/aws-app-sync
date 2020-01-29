@@ -1,133 +1,99 @@
 const { Component } = require('@serverless/core')
-const { isEmpty, isNil, map, merge, mergeDeepRight, not, pick } = require('ramda')
-
-const {
-  createOrUpdateApiKeys,
-  createOrUpdateDataSources,
-  createOrUpdateFunctions,
-  createOrUpdateGraphqlApi,
-  createOrUpdateResolvers,
-  createSchema,
-  createServiceRole,
-  getClients,
-  removeGraphqlApi,
-  removeObsoleteApiKeys,
-  removeObsoleteDataSources,
-  removeObsoleteFunctions,
-  removeObsoleteResolvers,
-  removeRole
-} = require('./utils')
-
-const defaults = {
-  region: 'us-east-1'
-}
+const lib = require('./lib')
+const utils = require('./utils')
 
 class AwsAppSync extends Component {
+
+  /**
+   * Deploy
+   * @param {*} inputs 
+   */
   async deploy(inputs = {}) {
-    const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
-    config.src = inputs.src
 
-    if (config.src) {
+    console.log('Deploying a graphql API via AWS App Sync...')
+
+    // Merge inputs with defaults and state
+    inputs.name = inputs.name || `app-sync-${lib.generateRandomId()}`
+    inputs.src = inputs.src || null
+    inputs.authenticationType = inputs.authenticationType || 'API_KEY'
+    inputs.apiKeys = inputs.apiKeys || []
+    inputs.dataSources = inputs.dataSources || []
+    inputs.mappingTemplates = inputs.mappingTemplates || []
+    // DO NOT MESS WITH THE APIID INPUT - This component will be designed to work with EXISTING APIs and extend them, as well as create NEW ones.  The "apiId" input is reserved for this future functionality.
+    inputs.apiId = inputs.apiId || null
+    if (inputs.apiId) { this.state.isApiCreator = false }
+
+    // Instantiate SDKs
+    const { appSync, iam } = utils.getClients(this.credentials.aws, inputs.region)
+
+    // Unzip any source files, which might contain schema
+    if (inputs.src) {
       console.log('Unzipping source files')
-      config.src = await this.unzip(config.src, true) // Returns directory with unzipped files
+      inputs.src = await this.unzip(inputs.src, true) // Returns directory with unzipped files
     }
 
-    const { appSync, iam } = getClients(this.credentials.aws, config.region)
-    const graphqlApi = await createOrUpdateGraphqlApi(appSync, config, this)
-    config.apiId = graphqlApi.apiId || config.apiId
-    config.arn = graphqlApi.arn
-    config.uris = graphqlApi.uris
-    config.isApiCreator = isNil(inputs.apiId)
-    config.roleArn = inputs.roleArn || this.state.roleArn
-    config.policyArn = this.state.policyArn
+    // Create/update the core GraphQL API
+    console.log('Creating or updating your graphql API')
+    const graphqlApi = await lib.createOrUpdateGraphqlApi(appSync, inputs, this.state)
+    this.state.apiId = graphqlApi.apiId || inputs.apiId
+    this.state.arn = graphqlApi.arn
+    this.state.uris = graphqlApi.uris
+    this.state.isApiCreator = inputs.apiId ? false : true
+    this.state.region = inputs.region
 
-    if (!config.roleArn) {
-      const res = await createServiceRole(iam, config, this)
-      config.roleArn = res.roleArn
-      config.policyArn = res.policyArn
-      this.state.roleArn = config.roleArn
-      this.state.policyArn = config.policyArn
+    // If no AWS IAM Role is provided, auto-create one that gives access to all listed data sources
+    if (!inputs.roleArn) {
+      console.log('No IAM Role provided.  Automatically creating an IAM Role with necessary permissions...')
+      const res = await lib.createOrUpdateServiceRole(iam, inputs)
+      this.state.autoRoleArn = res.role.Arn
+      this.state.autoPolicyArn = res.policy.Arn
     }
 
-    config.dataSources = map((datasource) => {
-      if (isNil(datasource.serviceRoleArn)) {
-        datasource.serviceRoleArn = config.roleArn
-      }
-      return datasource
-    }, config.dataSources || [])
+    // Create, update, delete datasources
+    const datasources = await lib.createUpdateOrDeleteDataSources(appSync, inputs, this.state)
 
-    config.dataSources = await createOrUpdateDataSources(appSync, config, this)
-    config.schemaChecksum = await createSchema(appSync, config, this.state, this)
-    config.mappingTemplates = await createOrUpdateResolvers(appSync, config, this)
-    config.functions = await createOrUpdateFunctions(appSync, config, this)
-    config.apiKeys = await createOrUpdateApiKeys(appSync, config, this.state, this)
+    // Create, update schema
+    this.state.schemaChecksum = await lib.processSchema(appSync, inputs, this.state)
 
-    await removeObsoleteResolvers(appSync, config, this.state, this)
-    await removeObsoleteFunctions(appSync, config, this.state, this)
-    await removeObsoleteDataSources(appSync, config, this.state, this)
-    await removeObsoleteApiKeys(appSync, config, this.state, this)
+    // Mapping Templates
+    const mappingTemplates = await lib.createOrUpdateResolvers(appSync, inputs, this.state)
 
-    this.state = pick(['arn', 'schemaChecksum', 'apiKeys', 'uris', 'roleArn', 'policyArn'], config)
-    this.state.apiId = config.apiId
-    this.state.isApiCreator = config.isApiCreator
-    this.state.dataSources = map(pick(['name', 'type']), config.dataSources)
-    this.state.mappingTemplates = map(pick(['type', 'field']), config.mappingTemplates)
-    this.state.functions = map(pick(['name', 'dataSource', 'functionId']), config.functions) // deploy functions with same names is not possible
+    // Api Keys
+    const apiKeys = await lib.createOrUpdateApiKeys(appSync, inputs, this.state)
 
-    let output = pick(['apiId', 'arn', 'uris'], config)
+    const outputs = {}
+    outputs.apiId = this.state.apiId
+    outputs.urls = this.state.uris
+    outputs.serviceRoleArn = this.state.autoPolicyArn
 
-    // Eslam - temporarly output a single url
-    output.url = output.uris.GRAPHQL
-    delete output.uris
-
-    // TODO: Add domain support back in
-
-    if (not(isNil(config.apiKeys)) && not(isEmpty(config.apiKeys))) {
-      output = merge(output, {
-        apiKeys: map(({ id }) => id, config.apiKeys)
-      })
-    }
-
-    return output
+    return outputs
   }
 
-  // eslint-disable-next-line no-unused-vars
+  /**
+   * Remove
+   * @param {*} inputs 
+   */
   async remove(inputs = {}) {
-    const config = mergeDeepRight(merge(defaults, { apiId: this.state.apiId }), inputs)
-    const { appSync, iam } = getClients(this.credentials.aws, config.region)
-    if (not(this.state.isApiCreator)) {
-      console.log('Remove created resources from existing API without deleting the API.')
-      await removeObsoleteResolvers(
-        appSync,
-        { apiId: this.state.apiId, mappingTemplates: [] },
-        this.state
-      )
-      await removeObsoleteFunctions(
-        appSync,
-        { apiId: this.state.apiId, functions: [] },
-        this.state
-      )
-      await removeObsoleteDataSources(
-        appSync,
-        { apiId: this.state.apiId, dataSources: [] },
-        this.state
-      )
-      await removeObsoleteApiKeys(appSync, { apiId: this.state.apiId, apiKeys: [] })
-    } else {
+    const { appSync, iam } = utils.getClients(this.credentials.aws, this.state.region)
+
+    // If a role was auto-created, delete it
+    if (this.state.autoRoleArn) {
+      console.log(`Removing policy with arn ${this.state.autoPolicyArn}.`)
+      console.log(`Removing role with arn ${this.state.autoRoleArn}.`)
+      await lib.removeServiceRoleAndPolicy(iam, this.state.autoRoleArn, this.state.autoPolicyArn)
+    }
+
+    // Remove graphql api
+    if (this.state.apiId) {
       console.log(`Removing AppSync API with ID ${this.state.apiId}.`)
-      await removeGraphqlApi(appSync, { apiId: this.state.apiId })
+      try {
+        await appSync.deleteGraphqlApi({ apiId: this.state.apiId }).promise()
+      } catch(error) {
+        if (error.code !== 'NotFoundException') {
+          throw error
+        }
+      }
     }
-
-    if (this.state.roleArn) {
-      console.log(`Removing policy with arn ${this.state.policyArn}.`)
-      console.log(`Removing role with arn ${this.state.roleArn}.`)
-
-      await removeRole(iam, this.state)
-    }
-
-    // TODO: Add domain support
-    // const domain = await this.load('@serverless/domain', 'apiDomain')
-    // await domain.remove()
 
     this.state = {}
   }
