@@ -4,19 +4,19 @@
  * @param {object} config
  * @returns {object} - graphqlApi
  */
-const createOrUpdateGraphqlApi = async (appSync, inputs) => {
+const createOrUpdateGraphqlApi = async (appSync, inputs, state) => {
   let graphqlApi
 
-  if (inputs.apiId) {
+  // Try to fetch by an existing ID created by THIS Component
+  if (state.apiId) {
     console.log(`Fetching graphql API by API id: ${inputs.apiId}`)
     try {
-      const response = await appSync.getGraphqlApi({ apiId: inputs.apiId }).promise()
+      const response = await appSync.getGraphqlApi({ apiId: state.apiId }).promise()
       graphqlApi = response.graphqlApi
     } catch (error) {
       if (error.code !== 'NotFoundException') {
         throw error
       }
-      console.log(`Could not find a graphql API with the ID: ${inputs.apiId}`)
     }
   }
 
@@ -31,9 +31,12 @@ const createOrUpdateGraphqlApi = async (appSync, inputs) => {
     })
     if (!graphqlApi) {
       console.log(`Could not find a graphql API with the name: ${inputs.name}`)
+    } else {
+      console.log(`Existing graphql API found by API name: ${inputs.name}`)
     }
   }
 
+  // Create params for create or update
   const params = {}
   params.name = inputs.name
   params.authenticationType = inputs.authenticationType
@@ -42,6 +45,9 @@ const createOrUpdateGraphqlApi = async (appSync, inputs) => {
   params.additionalAuthenticationProviders = inputs.additionalAuthenticationProviders || []
   if (inputs.logConfig) params.logConfig = inputs.logConfig
   if (inputs.tags) params.tags = inputs.tags
+
+  // TODO: In the future, this Component should be designed so that it can extend another instance of a graphql API.
+  // To make that happen, one should consider saving which config is created by ONLY this Component instance and what was created by other instances of this Component, which should be pulled in and reviewed first.
 
   if (!graphqlApi) {
     console.log('Creating a new graphql API')

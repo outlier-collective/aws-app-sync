@@ -1,4 +1,6 @@
 const AWS = require('aws-sdk')
+const fs = require('fs')
+const crypto = require('crypto')
 
 /**
  * Sleep
@@ -40,19 +42,43 @@ const getAccountId = async () => {
 }
 
 /**
- * Returns a subset of a object excluding defined keys
- * @param {array} keys
- * @param {object} obj
- * @returns {object} subset
+ * Create a checksum
+ * @param {String} data
+ * @returns {String} - checksum
  */
-const pickExcluded = (excludedKeys, obj) =>
-  pickBy((val, key) => not(includes(key, excludedKeys)), obj)
+const checksum = (data) => {
+  return crypto
+    .createHash('sha256')
+    .update(data)
+    .digest('hex')
+}
 
-const equalsByKeys = (keysToCheck, objA, objB) =>
-  equals(pick(keysToCheck, objA), pick(keysToCheck, objB))
+/**
+ * Check if the filePath is a file
+ * @param {*} filePath
+ */
+const isFile = async (filePath) =>
+  new Promise((resolve) => {
+    fs.stat(filePath, (error) => {
+      if (error) {
+        resolve(false)
+      }
+      resolve(true)
+    })
+  })
 
-const equalsByKeysExcluded = (keysToCheck, objA, objB) =>
-  equals(pickExcluded(keysToCheck, objA), pickExcluded(keysToCheck, objB))
+/**
+ * Reads if string is a file otherwise return
+ * @param {Object|String} data
+ * @returns {Object}
+ */
+const readIfFile = async (data) => {
+  let result = data
+  if (result && (await isFile(result))) {
+    result = fs.readFileSync(result, 'utf8')
+  }
+  return result
+}
 
 /**
  * Exports
@@ -62,7 +88,6 @@ const equalsByKeysExcluded = (keysToCheck, objA, objB) =>
    getClients,
    getAccountId,
    sleep,
-   equalsByKeysExcluded,
-   pickExcluded,
-   equalsByKeys,
+   checksum,
+   readIfFile
  }

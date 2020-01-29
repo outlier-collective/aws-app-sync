@@ -1,5 +1,6 @@
 const { Component } = require('@serverless/core')
 const lib = require('./lib')
+const utils = require('./utils')
 
 class AwsAppSync extends Component {
 
@@ -9,58 +10,57 @@ class AwsAppSync extends Component {
    */
   async deploy(inputs = {}) {
 
-    console.log('Deploying AWS App Sync')
+    console.log('Deploying a graphql API via AWS App Sync...')
 
     // Merge inputs with defaults and state
     inputs.name = inputs.name || `app-sync-${lib.generateRandomId()}`
-    inputs.apiId = inputs.apiId || this.state.apiId || null
     inputs.src = inputs.src || null
     inputs.authenticationType = inputs.authenticationType || 'API_KEY'
     inputs.apiKeys = inputs.apiKeys || []
     inputs.dataSources = inputs.dataSources || []
     inputs.mappingTemplates = inputs.mappingTemplates || []
+    // DO NOT MESS WITH THE APIID INPUT - This component will be designed to work with EXISTING APIs and extend them, as well as create NEW ones.  The "apiId" input is reserved for this future functionality.
+    inputs.apiId = inputs.apiId || null
+    if (inputs.apiId) { this.state.isApiCreator = false }
 
-    const { appSync, iam } = lib.getClients(this.credentials.aws, inputs.region)
+    // Instantiate SDKs
+    const { appSync, iam } = utils.getClients(this.credentials.aws, inputs.region)
 
+    // Unzip any source files, which might contain schema
     if (inputs.src) {
       console.log('Unzipping source files')
       inputs.src = await this.unzip(inputs.src, true) // Returns directory with unzipped files
     }
 
+    // Create/update the core GraphQL API
     console.log('Creating or updating your graphql API')
-    const graphqlApi = await lib.createOrUpdateGraphqlApi(appSync, inputs)
+    const graphqlApi = await lib.createOrUpdateGraphqlApi(appSync, inputs, this.state)
     this.state.apiId = graphqlApi.apiId || inputs.apiId
     this.state.arn = graphqlApi.arn
     this.state.uris = graphqlApi.uris
-    this.state.isApiCreator = inputs.apiId ? true : false
+    this.state.isApiCreator = inputs.apiId ? false : true
     this.state.region = inputs.region
 
     // If no AWS IAM Role is provided, auto-create one that gives access to all listed data sources
-    if (!inputs.roleArn && !this.state.autoRoleArn) {
-      console.log('No IAM Role provided.  Creating an IAM Role with access to all datasources')
-      const res = await lib.createServiceRole(iam, inputs)
-      this.state.autoRoleArn = res.roleArn
-      this.state.autoPolicyArn = res.policyArn
+    if (!inputs.roleArn) {
+      console.log('No IAM Role provided.  Automatically creating an IAM Role with necessary permissions...')
+      const res = await lib.createOrUpdateServiceRole(iam, inputs)
+      this.state.autoRoleArn = res.role.Arn
+      this.state.autoPolicyArn = res.policy.Arn
     }
 
-    inputs.dataSources.forEach((dataSource) => {
-      if (dataSource.serviceRoleArn) return
-      dataSource.serviceRoleArn = inputs.roleArn || this.state.autoRoleArn
-    })
+    // Create, update, delete datasources
+    const datasources = await lib.createUpdateOrDeleteDataSources(appSync, inputs, this.state)
 
-    const datasources = await lib.createOrUpdateDataSources(appSync, inputs)
-    console.log(datasources)
+    // Create, update schema
+    this.state.schemaChecksum = await lib.processSchema(appSync, inputs, this.state)
 
-    // inputs.dataSources = await createOrUpdateDataSources(appSync, inputs)
-    // inputs.schemaChecksum = await createSchema(appSync, inputs, this.state)
-    // inputs.mappingTemplates = await createOrUpdateResolvers(appSync, inputs)
-    // inputs.functions = await createOrUpdateFunctions(appSync, inputs)
-    // inputs.apiKeys = await createOrUpdateApiKeys(appSync, inputs, this.state)
+    // Mapping Templates
+    const mappingTemplates = await lib.createOrUpdateResolvers(appSync, inputs, this.state)
 
-    // await removeObsoleteResolvers(appSync, inputs, this.state)
-    // await removeObsoleteFunctions(appSync, inputs, this.state)
-    // await removeObsoleteDataSources(appSync, inputs, this.state)
-    // await removeObsoleteApiKeys(appSync, inputs, this.state)
+    inputs.apiKeys = await lib.createOrUpdateApiKeys(appSync, inputs, this.state)
+
+
 
     // this.state = pick(['arn', 'schemaChecksum', 'apiKeys', 'uris', 'roleArn', 'policyArn', 'autoRoleArn', 'autoPolicyArn'], inputs)
     // this.state.apiId = inputs.apiId
@@ -92,34 +92,25 @@ class AwsAppSync extends Component {
    * @param {*} inputs 
    */
   async remove(inputs = {}) {
-    const { appSync, iam } = lib.getClients(this.credentials.aws, this.state.region)
-    if (!this.state.isApiCreator) {
-      console.log('Remove created resources from existing API without deleting the API.')
-      await removeObsoleteResolvers(
-        appSync,
-        { apiId: this.state.apiId, mappingTemplates: [] },
-        this.state
-      )
-      await removeObsoleteFunctions(
-        appSync,
-        { apiId: this.state.apiId, functions: [] },
-        this.state
-      )
-      await removeObsoleteDataSources(
-        appSync,
-        { apiId: this.state.apiId, dataSources: [] },
-        this.state
-      )
-      await removeObsoleteApiKeys(appSync, { apiId: this.state.apiId, apiKeys: [] })
-    } else {
-      console.log(`Removing AppSync API with ID ${this.state.apiId}.`)
-      await removeGraphqlApi(appSync, { apiId: this.state.apiId })
-    }
+    const { appSync, iam } = utils.getClients(this.credentials.aws, this.state.region)
 
+    // If a role was auto-created, delete it
     if (this.state.autoRoleArn) {
       console.log(`Removing policy with arn ${this.state.autoPolicyArn}.`)
       console.log(`Removing role with arn ${this.state.autoRoleArn}.`)
-      await removeRole(iam, this.state)
+      await lib.removeServiceRoleAndPolicy(iam, this.state.autoRoleArn, this.state.autoPolicyArn)
+    }
+
+    // Remove graphql api
+    if (this.state.apiId) {
+      console.log(`Removing AppSync API with ID ${this.state.apiId}.`)
+      try {
+        await appSync.deleteGraphqlApi({ apiId: this.state.apiId }).promise()
+      } catch(error) {
+        if (error.code !== 'NotFoundException') {
+          throw error
+        }
+      }
     }
 
     this.state = {}
