@@ -58,33 +58,15 @@ class AwsAppSync extends Component {
     // Mapping Templates
     const mappingTemplates = await lib.createOrUpdateResolvers(appSync, inputs, this.state)
 
-    inputs.apiKeys = await lib.createOrUpdateApiKeys(appSync, inputs, this.state)
+    // Api Keys
+    const apiKeys = await lib.createOrUpdateApiKeys(appSync, inputs, this.state)
 
+    const outputs = {}
+    outputs.apiId = this.state.apiId
+    outputs.urls = this.state.uris
+    outputs.serviceRoleArn = this.state.autoPolicyArn
 
-
-    // this.state = pick(['arn', 'schemaChecksum', 'apiKeys', 'uris', 'roleArn', 'policyArn', 'autoRoleArn', 'autoPolicyArn'], inputs)
-    // this.state.apiId = inputs.apiId
-    // this.state.isApiCreator = inputs.isApiCreator
-    // this.state.dataSources = map(pick(['name', 'type']), inputs.dataSources)
-    // this.state.mappingTemplates = map(pick(['type', 'field']), inputs.mappingTemplates)
-    // this.state.functions = map(pick(['name', 'dataSource', 'functionId']), inputs.functions) // deploy functions with same names is not possible
-    // console.log(this.state)
-
-    // let output = pick(['apiId', 'arn', 'uris'], inputs)
-
-    // // Eslam - temporarly output a single url
-    // output.url = output.uris.GRAPHQL
-    // delete output.uris
-
-    // // TODO: Add domain support
-
-    // if (not(isNil(inputs.apiKeys)) && not(isEmpty(inputs.apiKeys))) {
-    //   output = merge(output, {
-    //     apiKeys: map(({ id }) => id, inputs.apiKeys)
-    //   })
-    // }
-
-    // return output
+    return outputs
   }
 
   /**
