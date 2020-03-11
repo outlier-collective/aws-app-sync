@@ -1,5 +1,5 @@
 {
-  "name": "@serverless/aws-app-sync",
+  "name": "@yoimnik/serverless-aws-app-sync",
   "version": "1.2.0",
   "main": "./serverless.js",
   "publishConfig": {
